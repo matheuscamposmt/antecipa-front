@@ -28,6 +28,7 @@ import {
 
 type Props = {
   data: Creditor[];
+  companySlug?: string;
 };
 
 function StatusBadgeInline({ status, elegivel }: { status: Creditor["status"]; elegivel: boolean }) {
@@ -38,12 +39,12 @@ function StatusBadgeInline({ status, elegivel }: { status: Creditor["status"]; e
     return <span className="inline-flex items-center rounded-md border border-green-200 bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-800">Qualificado</span>;
   }
   if (status === "marginal") {
-    return <span className="inline-flex items-center rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800">Marginal</span>;
+    return <span className="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[11px] font-medium text-warning">Marginal</span>;
   }
   return <span className="inline-flex items-center rounded-md border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">Rejeitado</span>;
 }
 
-export function CreditorsTable({ data }: Props) {
+export function CreditorsTable({ data, companySlug }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "score", desc: true }]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -70,10 +71,11 @@ export function CreditorsTable({ data }: Props) {
     () => [
       {
         accessorKey: "nome",
-        header: "Prospect",
+        header: "Credor",
         cell: ({ row }) => (
           <Link
             to={`/credor/rj/${row.original.rowHash}`}
+            state={companySlug ? { backTo: `/empresa/${companySlug}`, backLabel: "Voltar para a empresa" } : undefined}
             className="font-medium text-primary hover:underline"
           >
             {row.original.nome}
@@ -121,8 +123,8 @@ export function CreditorsTable({ data }: Props) {
         cell: ({ row }) => {
           const score = row.original.score;
           const color =
-            score >= 65 ? "text-green-700 font-semibold" :
-            score >= 50 ? "text-amber-700 font-semibold" :
+            score >= 65 ? "text-primary font-semibold" :
+            score >= 50 ? "text-warning font-semibold" :
             "text-muted-foreground";
           return <span className={color}>{score || "—"}</span>;
         },
@@ -247,7 +249,7 @@ export function CreditorsTable({ data }: Props) {
             ) : (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                  Nenhum prospect encontrado para os filtros selecionados.
+                  Nenhum credor encontrado para os filtros selecionados.
                 </TableCell>
               </TableRow>
             )}

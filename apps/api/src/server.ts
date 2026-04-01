@@ -1,9 +1,9 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { z } from "zod";
-import { loadCompanies, loadCompanyDetail, loadCredorRJDetail, loadOverview, type CompanyItem } from "./data.js";
+import { loadCompanies, loadCompanyDetail, loadCredorPhones, loadCredorRJDetail, loadOverview, type CompanyItem } from "./data.js";
 import { hasRedshiftConfigured } from "./redshift.js";
-import { loadPrecatorioDebtors, loadPrecatorioDetail, loadPrecatorioOverview } from "./precatorios-data.js";
+import { loadCredorPrecatorioDetail, loadPrecatorioDebtors, loadPrecatorioDetail, loadPrecatorioOverview, loadProcessoDetail } from "./precatorios-data.js";
 
 const server = Fastify({ logger: true });
 await server.register(cors, { origin: true });
@@ -94,6 +94,33 @@ server.get("/api/credores/rj/:hash", async (request, reply) => {
   return detail;
 });
 
+server.get("/api/credores/rj/:hash/phones", async (request, reply) => {
+  const paramsSchema = z.object({ hash: z.string().min(1) });
+  const { hash } = paramsSchema.parse(request.params);
+  const telefones = await loadCredorPhones(hash);
+  if (telefones === null) {
+    return reply.code(404).send({ error: "Credor não encontrado" });
+  }
+  return { telefones };
+});
+
+server.get("/api/credores/precatorio/:numeroProcesso/:credorNome", async (request, reply) => {
+  const paramsSchema = z.object({
+    numeroProcesso: z.string().min(1),
+    credorNome: z.string().min(1),
+  });
+  const { numeroProcesso, credorNome } = paramsSchema.parse(request.params);
+
+  const detail = await loadCredorPrecatorioDetail(
+    decodeURIComponent(numeroProcesso),
+    decodeURIComponent(credorNome),
+  );
+  if (!detail) {
+    return reply.code(404).send({ error: "Credor não encontrado" });
+  }
+  return detail;
+});
+
 server.get("/api/devedores/:slug", async (request, reply) => {
   const paramsSchema = z.object({
     slug: z.string().min(1),
@@ -103,6 +130,16 @@ server.get("/api/devedores/:slug", async (request, reply) => {
   const detail = await loadPrecatorioDetail(slug);
   if (!detail) {
     return reply.code(404).send({ error: "Devedor não encontrado" });
+  }
+  return detail;
+});
+
+server.get("/api/processos/:numero", async (request, reply) => {
+  const paramsSchema = z.object({ numero: z.string().min(1) });
+  const { numero } = paramsSchema.parse(request.params);
+  const detail = await loadProcessoDetail(decodeURIComponent(numero));
+  if (!detail) {
+    return reply.code(404).send({ error: "Processo não encontrado" });
   }
   return detail;
 });

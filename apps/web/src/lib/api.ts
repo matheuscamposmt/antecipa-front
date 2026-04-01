@@ -1,11 +1,13 @@
 import type {
   Company,
   CompanyDetail,
+  CredorPrecatorioDetail,
   CredorRJDetail,
   DevedorDetail,
   Overview,
   PrecatorioDebtor,
   PrecatorioOverview,
+  ProcessoDetail,
 } from "@/types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8787";
@@ -52,8 +54,26 @@ export async function fetchDevedorDetail(slug: string): Promise<DevedorDetail> {
   return getJson<DevedorDetail>(`/api/devedores/${slug}`);
 }
 
+export async function fetchProcessoDetail(numeroProcesso: string): Promise<ProcessoDetail> {
+  return getJson<ProcessoDetail>(`/api/processos/${encodeURIComponent(numeroProcesso)}`);
+}
+
 export async function fetchCredorRJDetail(hash: string): Promise<CredorRJDetail> {
   return getJson<CredorRJDetail>(`/api/credores/rj/${hash}`);
+}
+
+export async function fetchCredorRJPhones(hash: string): Promise<string[]> {
+  const result = await getJson<{ telefones: string[] }>(`/api/credores/rj/${hash}/phones`);
+  return result.telefones;
+}
+
+export async function fetchCredorPrecatorioDetail(
+  numeroProcesso: string,
+  credorNome: string,
+): Promise<CredorPrecatorioDetail> {
+  return getJson<CredorPrecatorioDetail>(
+    `/api/credores/precatorio/${encodeURIComponent(numeroProcesso)}/${encodeURIComponent(credorNome)}`,
+  );
 }
 
 export type PrecatorioListResponse = {

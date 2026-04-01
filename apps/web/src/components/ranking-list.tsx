@@ -9,18 +9,19 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 type Props = {
   ranking: Creditor[];
+  companySlug?: string;
 };
 
 const TOOLTIP_CLASS =
   "max-w-72 rounded-md border border-border/70 bg-card px-3 py-2 text-[11px] text-card-foreground shadow-sm";
 
-export function RankingList({ ranking }: Props) {
+export function RankingList({ ranking, companySlug }: Props) {
   const top = ranking.slice(0, 10);
 
   return (
     <Card className="border-primary/10">
       <CardHeader>
-        <CardTitle className="text-base">Ranking de prospects qualificados</CardTitle>
+        <CardTitle className="text-base">Ranking de credores qualificados</CardTitle>
         <p className="text-xs text-muted-foreground">
           Classe I · valor até 15 salários mínimos · score ≥ 50
         </p>
@@ -28,7 +29,7 @@ export function RankingList({ ranking }: Props) {
 
       <CardContent className="space-y-2">
         {top.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Sem prospects elegíveis para calcular ranking.</p>
+          <p className="text-sm text-muted-foreground">Sem credores elegíveis para calcular ranking.</p>
         ) : null}
 
         <TooltipProvider delayDuration={120}>
@@ -43,6 +44,7 @@ export function RankingList({ ranking }: Props) {
                     </span>
                     <Link
                       to={`/credor/rj/${creditor.rowHash}`}
+                      state={companySlug ? { backTo: `/empresa/${companySlug}`, backLabel: "Voltar para a empresa" } : undefined}
                       className="line-clamp-2 text-sm font-semibold leading-tight text-primary hover:underline"
                     >
                       {creditor.nome}
@@ -122,7 +124,7 @@ export function RankingList({ ranking }: Props) {
 function ScoreChip({ score }: { score: number }) {
   const variant =
     score >= 65 ? "bg-green-100 text-green-800 border-green-200" :
-    score >= 50 ? "bg-amber-100 text-amber-800 border-amber-200" :
+    score >= 50 ? "bg-warning/10 text-warning border-warning/30" :
     "bg-muted text-muted-foreground border-border";
 
   return (
@@ -138,7 +140,7 @@ function StatusChip({ status, elegivel }: { status: Creditor["status"]; elegivel
     status === "qualificado"
       ? "bg-green-100 text-green-800 border-green-200"
       : status === "marginal"
-      ? "bg-amber-100 text-amber-800 border-amber-200"
+      ? "bg-warning/10 text-warning border-warning/30"
       : "bg-muted text-muted-foreground border-border";
   const label =
     status === "qualificado" ? "Qualificado" : status === "marginal" ? "Marginal" : "Rejeitado";

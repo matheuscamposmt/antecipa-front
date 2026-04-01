@@ -1,9 +1,11 @@
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { AlertCircle, Building2, ExternalLink, FileText, Scale, Users, Wallet } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { fetchCompanyDetail } from "@/lib/api";
 import { brl, integer } from "@/lib/format";
 import type { CompanyDetail } from "@/types";
+import { MetricCard } from "@/components/metric-card";
 import { CreditorsTable } from "@/components/creditors-table";
 import { RankingList } from "@/components/ranking-list";
 import { Badge } from "@/components/ui/badge";
@@ -45,12 +47,13 @@ export function CompanyPage() {
   if (loading) {
     return (
       <div className="space-y-6 p-4 lg:p-6">
-        <div className="rounded-xl border p-5 space-y-3">
-          <Skeleton className="h-3 w-48" />
-          <Skeleton className="h-7 w-80" />
+        <div className="rounded-xl border p-5 space-y-4">
+          <Skeleton className="h-3 w-40" />
+          <Skeleton className="h-8 w-96" />
           <div className="flex gap-2">
             <Skeleton className="h-6 w-32" />
             <Skeleton className="h-6 w-40" />
+            <Skeleton className="h-6 w-20" />
           </div>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -64,7 +67,7 @@ export function CompanyPage() {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <div className="xl:col-span-8 rounded-xl border p-4 space-y-3">
             <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-3 w-64" />
             <div className="space-y-2">
               {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
@@ -81,10 +84,11 @@ export function CompanyPage() {
   if (error || !detail) {
     return (
       <div className="p-6">
-        <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
-          <AlertCircle className="size-4 text-destructive" />
-          {error || "Empresa não encontrada"}
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="size-4" />
+          <AlertTitle>Erro ao carregar</AlertTitle>
+          <AlertDescription>{error || "Empresa não encontrada."}</AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -96,18 +100,21 @@ export function CompanyPage() {
   return (
     <div className="space-y-6 p-4 lg:p-6">
       <section className="pb-2">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">Empresa em Recuperação Judicial</p>
+        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+          Recuperação Judicial
+        </p>
         <h1 className="mt-1 text-xl font-semibold leading-tight">{company.nomeEmpresa}</h1>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Badge variant="outline">{company.grupoEconomico || "Sem grupo econômico"}</Badge>
-          <Badge variant="outline">AJ: {company.administradorJudicial}</Badge>
+          {company.administradorJudicial && (
+            <Badge variant="outline">AJ: {company.administradorJudicial}</Badge>
+          )}
           {qualificados > 0 && (
-            <Badge className="bg-green-600 text-white hover:bg-green-700">
+            <Badge className="bg-primary text-primary-foreground hover:bg-primary/90">
               {qualificados} qualificado{qualificados !== 1 ? "s" : ""}
             </Badge>
           )}
           {marginais > 0 && (
-            <Badge className="bg-amber-500 text-white hover:bg-amber-600">
+            <Badge className="bg-warning text-warning-foreground hover:bg-warning/90">
               {marginais} marginal{marginais !== 1 ? "is" : ""}
             </Badge>
           )}
@@ -116,10 +123,10 @@ export function CompanyPage() {
               href={company.linkCredores}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-muted"
+              className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <FileText className="size-3" />
-              Documento fonte
+              Fonte
               <ExternalLink className="size-3" />
             </a>
           ) : null}
@@ -127,56 +134,34 @@ export function CompanyPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard icon={Wallet} label="Valor total de créditos" value={brl(company.totalCredito)} />
-        <MetricCard icon={Scale} label="Prospects mapeados" value={integer(company.quantidadeCredores)} />
+        <MetricCard icon={Wallet} label="Crédito total" value={brl(company.totalCredito)} />
+        <MetricCard icon={Scale} label="Credores mapeados" value={integer(company.quantidadeCredores)} />
         <MetricCard
           icon={Users}
           label="PF / PJ"
           value={`${integer(company.quantidadePF)} / ${integer(company.quantidadePJ)}`}
         />
-        <MetricCard icon={Building2} label="Data homologação" value={company.dataHomologacao || "Não informado"} />
+        <MetricCard icon={Building2} label="Relação de credores" value={company.dataDocumento || "—"} />
       </section>
 
       <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="xl:col-span-8">
           <Card className="border-primary/10">
             <CardHeader>
-              <CardTitle className="text-base">Relação de prospects desta empresa</CardTitle>
+              <CardTitle className="text-base">Credores mapeados</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Apenas créditos Classe I (trabalhistas) com valor de até 15 salários mínimos são elegíveis para o FIDC-NP.
+                Elegíveis: Classe I (trabalhistas) com valor de até 15 salários mínimos.
               </p>
             </CardHeader>
             <CardContent>
-              <CreditorsTable data={detail.credores} />
+              <CreditorsTable data={detail.credores} companySlug={company.slug} />
             </CardContent>
           </Card>
         </div>
         <div className="xl:col-span-4">
-          <RankingList ranking={detail.ranking} />
+          <RankingList ranking={detail.ranking} companySlug={company.slug} />
         </div>
       </section>
     </div>
-  );
-}
-
-function MetricCard({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-}) {
-  return (
-    <Card className="border-primary/10">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
-        <Icon className="size-4 text-primary/80" />
-      </CardHeader>
-      <CardContent>
-        <p className="text-lg font-semibold">{value}</p>
-      </CardContent>
-    </Card>
   );
 }

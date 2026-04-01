@@ -1,9 +1,8 @@
 import type { ComponentType } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, Building2, CalendarCheck2, CalendarDays, CircleHelp, FileText, Landmark, Scale, Users } from "lucide-react";
+import { ArrowUpRight, Building2, CalendarDays, CircleHelp, FileText, Landmark, Scale, Users } from "lucide-react";
 import type { Company } from "@/types";
 import { brl, integer } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -17,83 +16,88 @@ const TOOLTIP_CLASS =
 
 export function CompanyCard({ company }: Props) {
   return (
-    <Card className="animate-enter h-full border-primary/10 bg-card/90">
-      <CardHeader className="space-y-2 pb-1">
+    <Card className="animate-enter flex h-full flex-col border-border bg-card">
+      <CardHeader className="space-y-2 pb-2">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="line-clamp-2 text-base leading-snug">{company.nomeEmpresa}</CardTitle>
-          <Building2 className="mt-1 size-4 text-primary/70" />
+          <Building2 className="mt-0.5 size-4 shrink-0 text-primary/60" />
         </div>
-        <p className="line-clamp-1 text-xs text-muted-foreground">
-          {company.grupoEconomico || "Sem grupo econômico"}
-        </p>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm">
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-md p-2">
-            <p className="mb-1 inline-flex items-center gap-1 text-[13px] text-muted-foreground">
-              <CalendarCheck2 className="size-3.5" />
-              Data de homologação
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button type="button" className="text-muted-foreground/80 transition-colors hover:text-foreground" aria-label="Explicação da data de homologação">
-                      <CircleHelp className="size-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className={TOOLTIP_CLASS}>Data da homologação judicial do plano de recuperação.</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </p>
-            <p className="text-[15px] font-medium leading-tight">{company.dataHomologacao || "Não informado"}</p>
-          </div>
-          <div className="rounded-md p-2">
-            <p className="mb-1 inline-flex items-center gap-1 text-[13px] text-muted-foreground">
-              <CalendarDays className="size-3.5" />
-              Data do documento
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button type="button" className="text-muted-foreground/80 transition-colors hover:text-foreground" aria-label="Explicação da data do documento de credores">
-                      <CircleHelp className="size-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className={TOOLTIP_CLASS}>Data da relação de credores usada como base mais recente.</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </p>
-            <p className="text-[15px] font-medium leading-tight">{company.dataDocumento || "Não informado"}</p>
-          </div>
+
+      <CardContent className="flex flex-1 flex-col space-y-3 text-sm">
+        <div className="grid grid-cols-1 gap-2">
+          <DateStat
+            icon={CalendarDays}
+            label="Relação de credores"
+            value={company.dataDocumento || "—"}
+            tooltip="Data da relação de credores usada como base."
+          />
         </div>
-        <div className="grid grid-cols-3 gap-2 text-sm">
+
+        <div className="grid grid-cols-3 gap-2">
           <StatBadge icon={Users} label="Credores" value={integer(company.quantidadeCredores)} />
-          <StatBadge icon={Building2} label="Pessoas Jurídicas" value={integer(company.quantidadePJ)} />
-          <StatBadge icon={Scale} label="Pessoas Físicas" value={integer(company.quantidadePF)} />
+          <StatBadge icon={Building2} label="PJ" value={integer(company.quantidadePJ)} />
+          <StatBadge icon={Scale} label="PF" value={integer(company.quantidadePF)} />
         </div>
-        <div className="space-y-1">
-          <p className="inline-flex items-center gap-1 text-[13px] text-muted-foreground">
+
+        <div className="mt-auto space-y-0.5">
+          <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
             <Landmark className="size-3.5" />
-            Valor total do crédito
+            Crédito total
           </p>
-          <p className="text-lg font-semibold">{brl(company.totalCredito)}</p>
+          <p className="text-xl font-semibold tracking-tight">{brl(company.totalCredito)}</p>
         </div>
       </CardContent>
-      <CardFooter className="flex items-center justify-between gap-2">
+
+      <CardFooter className="flex items-center justify-between gap-2 pt-0">
         <Button asChild size="sm" className="gap-1">
           <Link to={`/empresa/${company.slug}`}>
             Ver credores
-            <ArrowUpRight className="size-4" />
+            <ArrowUpRight className="size-3.5" />
           </Link>
         </Button>
         {company.linkCredores ? (
           <Button variant="ghost" size="sm" asChild>
-            <a href={company.linkCredores} target="_blank" rel="noreferrer" className="gap-1">
-              <FileText className="size-4" />
+            <a href={company.linkCredores} target="_blank" rel="noreferrer" className="gap-1 text-muted-foreground">
+              <FileText className="size-3.5" />
               Fonte
             </a>
           </Button>
         ) : null}
       </CardFooter>
     </Card>
+  );
+}
+
+function DateStat({
+  icon: Icon,
+  label,
+  value,
+  tooltip,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  tooltip: string;
+}) {
+  return (
+    <div className="rounded-md border border-border/60 p-2">
+      <p className="mb-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+        <Icon className="size-3" />
+        {label}
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" className="text-muted-foreground/60 hover:text-muted-foreground" aria-label={tooltip}>
+                <CircleHelp className="size-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className={TOOLTIP_CLASS}>{tooltip}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </p>
+      <p className="text-sm font-medium leading-tight">{value}</p>
+    </div>
   );
 }
 
@@ -107,10 +111,12 @@ function StatBadge({
   value: string;
 }) {
   return (
-    <Badge variant="outline" className="h-auto items-start justify-start gap-1.5 rounded-md px-2 py-1.5">
-      <Icon className="mt-0.5 size-3.5 shrink-0" />
-      <span className="min-w-0 text-[12px] leading-tight text-muted-foreground">{label}</span>
-      <span className="ml-auto text-sm font-medium">{value}</span>
-    </Badge>
+    <div className="flex flex-col rounded-md border border-border/60 px-2 py-1.5">
+      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="mt-0.5 flex items-center gap-1 text-sm font-semibold">
+        <Icon className="size-3 text-primary/60" />
+        {value}
+      </span>
+    </div>
   );
 }

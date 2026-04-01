@@ -1,4 +1,14 @@
-import { loadPhonesByNames, normalizeNameForMatch, queryRows, toNumber } from "./redshift.js";
+import {
+  buildCredorScoreDimension,
+  type DetailScoreBreakdown,
+  type DetailScoreDimension,
+  hasValidDocument,
+  inferDocType,
+  loadCompanyPgfnContext,
+  loadProspectDetails,
+  type ProspectDetails,
+} from "./prospect-enrichment.js";
+import { loadPhonesByContacts, normalizeNameForMatch, queryRows, toNumber } from "./redshift.js";
 
 type NullableString = string | null;
 
@@ -71,11 +81,8 @@ export type CredorRJDetail = {
   status: ProspectStatus;
   desagioRec: string;
   elegivel: boolean;
-  scoreBreakdown: {
-    ativo: { classe: number; documento: number; sinais: number; total: number };
-    devedor: { faixa: number; total: number };
-    credor: { tipoPessoa: number; valor: number; total: number };
-  };
+  scoreBreakdown: DetailScoreBreakdown;
+  prospectDetails: ProspectDetails;
   empresa: {
     nomeEmpresa: string;
     grupoEconomico: string;
@@ -132,6 +139,7 @@ export type OverviewData = {
   medianaValorPorEmpresa: number;
   topAdministradoresJudiciais: Array<{ nome: string; empresas: number }>;
   topClasses: Array<{ classe: string; quantidade: number }>;
+  topEmpresasPorCredito: Array<{ nome: string; totalCredito: number }>;
 };
 
 const SALARIO_MINIMO = Number.parseFloat(process.env.SALARIO_MINIMO ?? "1518");
@@ -163,25 +171,11 @@ function buildCompanySlug(nomeEmpresa: string, grupoEconomico: string): string {
 }
 
 function parseDocType(cpfCnpj: string): "PF" | "PJ" | "OUTRO" {
-  const digits = cpfCnpj.replace(/\D/g, "");
-  if (digits.length === 11) {
-    return "PF";
-  }
-  if (digits.length === 14) {
-    return "PJ";
-  }
-  if (cpfCnpj.includes("/")) {
-    return "PJ";
-  }
-  if (cpfCnpj.includes("-")) {
-    return "PF";
-  }
-  return "OUTRO";
+  return inferDocType(cpfCnpj);
 }
 
 function hasValidCpfCnpj(cpfCnpj: string): boolean {
-  const digits = cpfCnpj.replace(/\D/g, "");
-  return digits.length === 11 || digits.length === 14;
+  return hasValidDocument(cpfCnpj);
 }
 
 function normalizeClasse(classe: string): string {
@@ -235,6 +229,186 @@ function statusFromScore(score: number): ProspectStatus {
   if (score >= 65) return "qualificado";
   if (score >= 50) return "marginal";
   return "rejeitado";
+}
+
+function computeAtivoDimension(creditor: {
+  classe: string;
+  cpfCnpj: string;
+  extra: string;
+}): DetailScoreDimension {
+  const classeNorm = normalizeClasse(creditor.classe);
+  const documentoValido = hasValidCpfCnpj(creditor.cpfCnpj);
+  const extraNorm = normalizeNameForMatch(creditor.extra || "");
+  const hasRisco = /(IMPUGN|DIVERGEN|CONTEST|RESERVA|SUB JUDICE|RETIFIC)/.test(extraNorm);
+
+  const classeScore = classeNorm === "I" ? 20 : 0;
+  const documentoScore = documentoValido ? 12 : 0;
+  const sinaisScore = hasRisco ? 0 : 8;
+
+  return {
+    total: classeScore + documentoScore + sinaisScore,
+    method: "regras_rj",
+    note: "Classe, documento e observações do AJ.",
+    items: [
+      { label: "Classe I (trabalhista)", pts: classeScore, max: 20 },
+      { label: "Documento válido", pts: documentoScore, max: 12 },
+      { label: "Sem contestação (AJ)", pts: sinaisScore, max: 8 },
+    ],
+  };
+}
+
+function computeFaixaFallback(valor: number): number {
+  const idealValue = MAX_CREDITO_TRABALHISTA / 2;
+  const distanceFromIdeal = Math.abs(valor - idealValue) / idealValue;
+  return Math.round(Math.max(0, 5 * (1 - Math.min(distanceFromIdeal, 1))));
+}
+
+async function computeRJDevedorDimension(params: {
+  nomeEmpresa: string;
+  dataHomologacao: string;
+  valor: number;
+}): Promise<DetailScoreDimension> {
+  const homologacaoScore = params.dataHomologacao ? 18 : 4;
+  const pgfnContext = await Promise.race<Awaited<ReturnType<typeof loadCompanyPgfnContext>>>([
+    loadCompanyPgfnContext(params.nomeEmpresa),
+    new Promise((resolve) => setTimeout(() => resolve(null), 1_500)),
+  ]);
+  const pgfnScore =
+    !pgfnContext ? 8 :
+    pgfnContext.quantidadeInscricoes === 0 ? 12 :
+    pgfnContext.valorConsolidado <= 100_000 ? 8 :
+    pgfnContext.valorConsolidado <= 1_000_000 ? 5 :
+    2;
+  const faixaFallback = computeFaixaFallback(params.valor);
+
+  return {
+    total: homologacaoScore + pgfnScore + faixaFallback,
+    method: pgfnContext ? "parcial_real_com_pgfn" : "parcial_real_sem_pgfn",
+    note: pgfnContext
+      ? "Homologação e PGFN inferida por razão social exata; coobrigados ainda pendentes."
+      : "Homologação real e complemento neutro; PGFN depende de match exato da razão social.",
+    items: [
+      { label: "Plano homologado", pts: homologacaoScore, max: 18 },
+      { label: "PGFN do devedor", pts: pgfnScore, max: 12 },
+      { label: "Faixa do crédito (fallback)", pts: faixaFallback, max: 5 },
+    ],
+  };
+}
+
+async function scoreCredorRJDetail(creditor: {
+  nome: string;
+  cpfCnpj: string;
+  tipoPessoa: "PF" | "PJ" | "OUTRO";
+  classe: string;
+  valor: number;
+  extra: string;
+  empresa: {
+    nomeEmpresa: string;
+    dataHomologacao: string;
+  };
+}): Promise<{
+  score: number;
+  scoreAtivo: number;
+  scoreDevedor: number;
+  scoreCredit: number;
+  status: ProspectStatus;
+  desagioRec: string;
+  elegivel: boolean;
+  scoreBreakdown: DetailScoreBreakdown;
+  prospectDetails: ProspectDetails;
+}> {
+  const classeNorm = normalizeClasse(creditor.classe);
+  const elegivel = classeNorm === "I" && creditor.valor > 0 && creditor.valor <= MAX_CREDITO_TRABALHISTA;
+
+  if (!elegivel) {
+    const prospectDetails = await loadProspectDetails({
+      nome: creditor.nome,
+      documento: creditor.cpfCnpj,
+      tipoPessoa: creditor.tipoPessoa,
+    });
+
+    return {
+      score: 0,
+      scoreAtivo: 0,
+      scoreDevedor: 0,
+      scoreCredit: 0,
+      status: "rejeitado",
+      desagioRec: "Não recomendado",
+      elegivel: false,
+      scoreBreakdown: {
+        ativo: {
+          total: 0,
+          method: "fora_criterio",
+          note: "Somente créditos Classe I elegíveis entram no score de originação.",
+          items: [
+            { label: "Classe I (trabalhista)", pts: 0, max: 20 },
+            { label: "Documento válido", pts: 0, max: 12 },
+            { label: "Sem contestação (AJ)", pts: 0, max: 8 },
+          ],
+        },
+        devedor: {
+          total: 0,
+          method: "fora_criterio",
+          note: "Prospect fora do recorte operacional atual.",
+          items: [
+            { label: "Plano homologado", pts: 0, max: 18 },
+            { label: "PGFN do devedor", pts: 0, max: 12 },
+            { label: "Faixa do crédito (fallback)", pts: 0, max: 5 },
+          ],
+        },
+        credor: {
+          total: 0,
+          method: "fora_criterio",
+          note: "Prospect fora do recorte operacional atual.",
+          items: [
+            { label: "Tipo de pessoa", pts: 0, max: 10 },
+            { label: "Faixa de valor", pts: 0, max: 15 },
+          ],
+        },
+      },
+      prospectDetails,
+    };
+  }
+
+  const prospectDetails = await loadProspectDetails({
+    nome: creditor.nome,
+    documento: creditor.cpfCnpj,
+    tipoPessoa: creditor.tipoPessoa,
+  });
+  const [ativo, devedor] = await Promise.all([
+    Promise.resolve(computeAtivoDimension(creditor)),
+    computeRJDevedorDimension({
+      nomeEmpresa: creditor.empresa.nomeEmpresa,
+      dataHomologacao: creditor.empresa.dataHomologacao,
+      valor: creditor.valor,
+    }),
+  ]);
+  const credorDimension = buildCredorScoreDimension({
+    tipoPessoa: creditor.tipoPessoa,
+    valor: creditor.valor,
+    prospect: prospectDetails,
+  });
+
+  const scoreAtivo = ativo.total;
+  const scoreDevedor = devedor.total;
+  const scoreCredit = credorDimension.total;
+  const score = Math.min(100, Math.max(0, scoreAtivo + scoreDevedor + scoreCredit));
+
+  return {
+    score,
+    scoreAtivo,
+    scoreDevedor,
+    scoreCredit,
+    status: statusFromScore(score),
+    desagioRec: desagioFromScore(score),
+    elegivel: true,
+    scoreBreakdown: {
+      ativo,
+      devedor,
+      credor: credorDimension,
+    },
+    prospectDetails,
+  };
 }
 
 function scoreCreditors(creditors: Omit<CreditorItem, "score" | "scoreAtivo" | "scoreDevedor" | "scoreCredit" | "status" | "desagioRec" | "elegivel" | "scoreBreakdown">[]): CreditorItem[] {
@@ -486,6 +660,10 @@ export async function loadOverview(): Promise<OverviewData> {
       .sort((a, b) => b.empresas - a.empresas)
       .slice(0, 8),
     topClasses,
+    topEmpresasPorCredito: companiesWithCreditors
+      .sort((a, b) => b.totalCredito - a.totalCredito)
+      .slice(0, 10)
+      .map((c) => ({ nome: c.nomeEmpresa, totalCredito: c.totalCredito })),
   };
 }
 
@@ -587,23 +765,7 @@ export async function loadCredorRJDetail(hash: string): Promise<CredorRJDetail |
   if (rows.length === 0) return null;
   const row = rows[0]!;
 
-  const phoneMap = await loadPhonesByNames([row.nome]);
-  const telefones = phoneMap.get(normalizeNameForMatch(row.nome)) ?? [];
-
   const cpfCnpj = row.cpf_cnpj ?? "";
-  const baseCreditor = {
-    rowHash: row.row_hash,
-    nome: row.nome,
-    cpfCnpj,
-    tipoPessoa: parseDocType(cpfCnpj),
-    classe: row.classe ?? "N/A",
-    valor: toNumber(row.valor),
-    moeda: row.moeda ?? "BRL",
-    extra: row.extra ?? "",
-    telefones,
-  };
-  const [scored] = scoreCreditors([baseCreditor]);
-  if (!scored) return null;
 
   type OutraEmpresaRow = {
     nome_da_empresa: string;
@@ -613,7 +775,7 @@ export async function loadCredorRJDetail(hash: string): Promise<CredorRJDetail |
     row_hash: string;
   };
 
-  const outrasRows = await queryRows<OutraEmpresaRow>(
+  const outrasPromise = queryRows<OutraEmpresaRow>(
     `
       SELECT DISTINCT
         d.nome_da_empresa,
@@ -631,6 +793,8 @@ export async function loadCredorRJDetail(hash: string): Promise<CredorRJDetail |
     [hash, row.nome, hasValidCpfCnpj(cpfCnpj) ? cpfCnpj : ""],
   );
 
+  const outrasRows = await outrasPromise;
+
   const empresa = {
     nomeEmpresa: row.nome_da_empresa,
     grupoEconomico: row.grupo_economico ?? "",
@@ -641,16 +805,33 @@ export async function loadCredorRJDetail(hash: string): Promise<CredorRJDetail |
     slug: buildCompanySlug(row.nome_da_empresa, row.grupo_economico ?? ""),
   };
 
+  const baseCreditor = {
+    rowHash: row.row_hash,
+    nome: row.nome,
+    cpfCnpj,
+    tipoPessoa: parseDocType(cpfCnpj),
+    classe: row.classe ?? "N/A",
+    valor: toNumber(row.valor),
+    moeda: row.moeda ?? "BRL",
+    extra: row.extra ?? "",
+    telefones: [],
+    empresa: {
+      nomeEmpresa: empresa.nomeEmpresa,
+      dataHomologacao: empresa.dataHomologacao,
+    },
+  };
+  const scored = await scoreCredorRJDetail(baseCreditor);
+
   return {
-    rowHash: scored.rowHash,
-    nome: scored.nome,
-    cpfCnpj: scored.cpfCnpj,
-    tipoPessoa: scored.tipoPessoa,
-    classe: scored.classe,
-    valor: scored.valor,
-    moeda: scored.moeda,
-    extra: scored.extra,
-    telefones,
+    rowHash: baseCreditor.rowHash,
+    nome: baseCreditor.nome,
+    cpfCnpj: baseCreditor.cpfCnpj,
+    tipoPessoa: baseCreditor.tipoPessoa,
+    classe: baseCreditor.classe,
+    valor: baseCreditor.valor,
+    moeda: baseCreditor.moeda,
+    extra: baseCreditor.extra,
+    telefones: [],
     score: scored.score,
     scoreAtivo: scored.scoreAtivo,
     scoreDevedor: scored.scoreDevedor,
@@ -659,6 +840,7 @@ export async function loadCredorRJDetail(hash: string): Promise<CredorRJDetail |
     desagioRec: scored.desagioRec,
     elegivel: scored.elegivel,
     scoreBreakdown: scored.scoreBreakdown,
+    prospectDetails: scored.prospectDetails,
     empresa,
     outrasEmpresas: outrasRows.map((r) => ({
       nomeEmpresa: r.nome_da_empresa,
@@ -669,6 +851,18 @@ export async function loadCredorRJDetail(hash: string): Promise<CredorRJDetail |
       rowHash: r.row_hash,
     })),
   };
+}
+
+export async function loadCredorPhones(hash: string): Promise<string[]> {
+  const rows = await queryRows<{ nome: string; cpf_cnpj: string | null }>(
+    `SELECT nome, cpf_cnpj FROM administradores_judiciais.credores WHERE row_hash = $1 LIMIT 1`,
+    [hash],
+  );
+  if (rows.length === 0) return [];
+  const nome = rows[0]!.nome;
+  const cpfCnpj = rows[0]!.cpf_cnpj ?? "";
+  const phoneMap = await loadPhonesByContacts([{ name: nome, document: cpfCnpj }]).catch(() => new Map<string, string[]>());
+  return phoneMap.get(normalizeNameForMatch(nome)) ?? [];
 }
 
 export { buildCompanySlug };
