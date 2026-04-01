@@ -89,12 +89,20 @@ export function PrecatoriosPage() {
 
       {loading ? (
         <PrecatoriosCardsSkeleton />
-      ) : (
+      ) : debtorsData?.items?.length ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {(debtorsData?.items ?? []).map((debtor) => (
+          {debtorsData.items.map((debtor) => (
             <PrecatorioCard key={debtor.slug} debtor={debtor} />
           ))}
         </div>
+      ) : (
+        <Alert>
+          <AlertCircle className="size-4" />
+          <AlertTitle>Nenhum devedor encontrado</AlertTitle>
+          <AlertDescription>
+            Tente um termo diferente para buscar por devedor, tribunal ou CNPJ.
+          </AlertDescription>
+        </Alert>
       )}
 
       <div className="flex items-center justify-between">

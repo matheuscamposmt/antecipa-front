@@ -152,25 +152,41 @@ export function DashboardPage() {
         {loading ? (
           <DashboardCardsSkeleton />
         ) : (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3">
-            {(companiesData?.items ?? [])
-              .filter((company) => {
-                if (creditMinApplied !== null && company.totalCredito < creditMinApplied) return false;
-                if (creditMaxApplied !== null && company.totalCredito > creditMaxApplied) return false;
-                if (homologFrom) {
-                  const homologIso = toIsoDate(company.dataDocumento);
-                  if (!homologIso || homologIso < homologFrom) return false;
-                }
-                if (homologTo) {
-                  const homologIso = toIsoDate(company.dataDocumento);
-                  if (!homologIso || homologIso > homologTo) return false;
-                }
-                return true;
-              })
-              .map((company) => (
-                <CompanyCard key={company.slug} company={company} />
-              ))}
-          </div>
+          (() => {
+            const filteredCompanies = (companiesData?.items ?? []).filter((company) => {
+              if (creditMinApplied !== null && company.totalCredito < creditMinApplied) return false;
+              if (creditMaxApplied !== null && company.totalCredito > creditMaxApplied) return false;
+              if (homologFrom) {
+                const homologIso = toIsoDate(company.dataDocumento);
+                if (!homologIso || homologIso < homologFrom) return false;
+              }
+              if (homologTo) {
+                const homologIso = toIsoDate(company.dataDocumento);
+                if (!homologIso || homologIso > homologTo) return false;
+              }
+              return true;
+            });
+
+            if (filteredCompanies.length === 0) {
+              return (
+                <Alert>
+                  <AlertCircle className="size-4" />
+                  <AlertTitle>Nenhuma empresa encontrada</AlertTitle>
+                  <AlertDescription>
+                    Ajuste os filtros aplicados para visualizar empresas e grupos econômicos.
+                  </AlertDescription>
+                </Alert>
+              );
+            }
+
+            return (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3">
+                {filteredCompanies.map((company) => (
+                  <CompanyCard key={company.slug} company={company} />
+                ))}
+              </div>
+            );
+          })()
         )}
 
         <div className="flex items-center justify-between">

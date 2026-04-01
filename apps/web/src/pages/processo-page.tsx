@@ -156,24 +156,32 @@ export function ProcessoPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {detail.precatorios.map((row, i) => (
-                  <TableRow key={`${row.numeroPrecatorio}-${i}`}>
-                    <TableCell className="font-mono text-xs">{row.numeroPrecatorio || "-"}</TableCell>
-                    <TableCell>{row.natureza || "-"}</TableCell>
-                    <TableCell>{row.pagamentoPreferencial}</TableCell>
-                    <TableCell>
-                      {row.suspenso ? (
-                        <Badge variant="destructive" className="text-xs opacity-80">Sim</Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Não</span>
-                      )}
+                {detail.precatorios.length > 0 ? (
+                  detail.precatorios.map((row, i) => (
+                    <TableRow key={`${row.numeroPrecatorio}-${i}`}>
+                      <TableCell className="font-mono text-xs">{row.numeroPrecatorio || "-"}</TableCell>
+                      <TableCell>{row.natureza || "-"}</TableCell>
+                      <TableCell>{row.pagamentoPreferencial}</TableCell>
+                      <TableCell>
+                        {row.suspenso ? (
+                          <Badge variant="destructive" className="text-xs opacity-80">Sim</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Não</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{row.vencimento || "-"}</TableCell>
+                      <TableCell>{row.dataRecebimento || "-"}</TableCell>
+                      <TableCell className="text-right">{brl(row.valorPrecatorio)}</TableCell>
+                      <TableCell className="text-right">{brl(row.valorPagamento)}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={8} className="h-20 text-center text-muted-foreground">
+                      Nenhum precatório vinculado a este processo.
                     </TableCell>
-                    <TableCell>{row.vencimento || "-"}</TableCell>
-                    <TableCell>{row.dataRecebimento || "-"}</TableCell>
-                    <TableCell className="text-right">{brl(row.valorPrecatorio)}</TableCell>
-                    <TableCell className="text-right">{brl(row.valorPagamento)}</TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </div>
