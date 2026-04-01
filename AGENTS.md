@@ -8,6 +8,7 @@
   - `db.sqlite`
   - `credores_extraidos.csv`
 - Keep UI code in `apps/web/src/components` and pages in `apps/web/src/pages`.
+- Do not commit local agent/runtime artifacts such as `.codex/`, `.omx/`, or ad hoc data snapshots unless explicitly requested.
 
 ## Build, Test, and Development Commands
 - `pnpm install`: install all workspace dependencies.
@@ -38,6 +39,10 @@
 - Precatórios: cards por devedor com badge visível de tribunal e navegação para a mesma página de empresa.
 - `/devedor/:slug` é a página própria do ente público com cards e tabela de pagamentos de precatórios.
 - Company detail: full creditors table (client filtering via TanStack), plus ranking with score breakdown.
+- Breadcrumbs/back navigation should stay consistent across dashboard, company, devedor, processo, and credor flows.
+- Prefer predictable, readable URLs and route params; avoid introducing parallel patterns for equivalent detail pages.
+- Loading, empty, and error states are part of the feature, not polish; keep them explicit and consistent.
+- Reuse existing cards, metric blocks, badges, alerts, and table patterns before introducing visual variants.
 - No login page for now.
 
 ## Commit & PR Guidelines
