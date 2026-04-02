@@ -22,8 +22,8 @@ export function DashboardPage() {
   const [search, setSearch] = useState("");
   const [creditMinInput, setCreditMinInput] = useState("");
   const [creditMaxInput, setCreditMaxInput] = useState("");
-  const [creditMinApplied, setCreditMinApplied] = useState<number | null>(null);
-  const [creditMaxApplied, setCreditMaxApplied] = useState<number | null>(null);
+  const [creditMin, setCreditMin] = useState<number | null>(null);
+  const [creditMax, setCreditMax] = useState<number | null>(null);
   const [homologFrom, setHomologFrom] = useState("");
   const [homologTo, setHomologTo] = useState("");
 
@@ -40,6 +40,8 @@ export function DashboardPage() {
             pageSize: 30,
             search,
             onlyWithCreditors,
+            creditMin,
+            creditMax,
           }),
         ]);
         if (!cancelled) {
@@ -60,7 +62,7 @@ export function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [search, page, onlyWithCreditors]);
+  }, [search, page, onlyWithCreditors, creditMin, creditMax]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -72,11 +74,10 @@ export function DashboardPage() {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      const min = parseMoneyInput(creditMinInput);
-      const max = parseMoneyInput(creditMaxInput);
-      setCreditMinApplied(min);
-      setCreditMaxApplied(max);
-    }, 250);
+      setCreditMin(parseMoneyInput(creditMinInput));
+      setCreditMax(parseMoneyInput(creditMaxInput));
+      setPage(1);
+    }, 400);
     return () => clearTimeout(timeout);
   }, [creditMinInput, creditMaxInput]);
 
@@ -155,8 +156,6 @@ export function DashboardPage() {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3">
             {(companiesData?.items ?? [])
               .filter((company) => {
-                if (creditMinApplied !== null && company.totalCredito < creditMinApplied) return false;
-                if (creditMaxApplied !== null && company.totalCredito > creditMaxApplied) return false;
                 if (homologFrom) {
                   const homologIso = toIsoDate(company.dataDocumento);
                   if (!homologIso || homologIso < homologFrom) return false;

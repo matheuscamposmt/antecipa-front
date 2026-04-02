@@ -37,12 +37,16 @@ export async function fetchCompanies(params: {
   pageSize?: number;
   search?: string;
   onlyWithCreditors?: boolean;
+  creditMin?: number | null;
+  creditMax?: number | null;
 }): Promise<CompanyListResponse> {
   const query = new URLSearchParams();
   query.set("page", String(params.page ?? 1));
   query.set("pageSize", String(params.pageSize ?? 24));
   query.set("search", params.search ?? "");
   query.set("onlyWithCreditors", String(params.onlyWithCreditors ?? false));
+  if (params.creditMin != null) query.set("creditMin", String(params.creditMin));
+  if (params.creditMax != null) query.set("creditMax", String(params.creditMax));
   return getJson<CompanyListResponse>(`/api/companies?${query.toString()}`);
 }
 

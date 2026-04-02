@@ -12,15 +12,15 @@ function filterCompanies(
   companies: CompanyItem[],
   search: string,
   onlyWithCreditors: boolean,
+  creditMin?: number | null,
+  creditMax?: number | null,
 ): CompanyItem[] {
   const query = search.trim().toLowerCase();
   return companies.filter((item) => {
-    if (onlyWithCreditors && item.quantidadeCredores === 0) {
-      return false;
-    }
-    if (!query) {
-      return true;
-    }
+    if (onlyWithCreditors && item.quantidadeCredores === 0) return false;
+    if (creditMin != null && item.totalCredito < creditMin) return false;
+    if (creditMax != null && item.totalCredito > creditMax) return false;
+    if (!query) return true;
     return (
       item.nomeEmpresa.toLowerCase().includes(query) ||
       item.grupoEconomico.toLowerCase().includes(query) ||
@@ -49,10 +49,12 @@ server.get("/api/companies", async (request) => {
     pageSize: z.coerce.number().int().min(1).max(200).default(24),
     search: z.string().default(""),
     onlyWithCreditors: z.coerce.boolean().default(false),
+    creditMin: z.coerce.number().positive().optional(),
+    creditMax: z.coerce.number().positive().optional(),
   });
-  const { page, pageSize, search, onlyWithCreditors } = querySchema.parse(request.query);
+  const { page, pageSize, search, onlyWithCreditors, creditMin, creditMax } = querySchema.parse(request.query);
 
-  const filtered = filterCompanies(await loadCompanies(), search, onlyWithCreditors);
+  const filtered = filterCompanies(await loadCompanies(), search, onlyWithCreditors, creditMin, creditMax);
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(page, totalPages);
