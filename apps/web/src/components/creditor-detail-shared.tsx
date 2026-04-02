@@ -1,8 +1,8 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import {
   ArrowUpRight,
+  ChevronDown,
   MapPin,
-  Info,
   Phone,
   Send,
   ShieldCheck,
@@ -12,6 +12,7 @@ import type { ProspectDetails, ProspectStatus } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import {
   Sheet,
@@ -223,10 +224,7 @@ function Dimension({
         ))}
       </dl>
       {note ? (
-        <p className="flex items-center gap-1 text-[10px] italic text-muted-foreground/60">
-          <Info className="size-2.5 shrink-0" />
-          {note}
-        </p>
+        <p className="text-[10px] italic text-muted-foreground/60">{note}</p>
       ) : null}
     </div>
   );
@@ -234,12 +232,11 @@ function Dimension({
 
 export function OriginationScoreCard({
   score,
-  desagioRec,
   dimensions,
   tone = "default",
 }: {
   score: number;
-  desagioRec: string;
+  desagioRec?: string;
   dimensions: Array<{
     label: string;
     description: string;
@@ -250,6 +247,7 @@ export function OriginationScoreCard({
   }>;
   tone?: "default" | "emerald";
 }) {
+  const [open, setOpen] = useState(false);
   const { text, bg, ring } = tone === "emerald" ? emeraldScoreColor(score) : scoreColor(score);
 
   return (
@@ -257,32 +255,51 @@ export function OriginationScoreCard({
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Score de originação</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-4">
+        {/* Score prominente */}
         <div className="flex items-end gap-3">
-          <span className={`text-5xl font-bold leading-none ${text}`}>{score}</span>
+          <span className={`text-6xl font-bold leading-none tabular-nums ${text}`}>{score}</span>
           <div className="mb-1 space-y-0.5">
             <p className="text-sm leading-none text-muted-foreground">/100</p>
-            <p className={`text-xs font-semibold ${text}`}>{scoreLabelText(score)}</p>
+            <p className={`text-sm font-semibold ${text}`}>{scoreLabelText(score)}</p>
           </div>
+        </div>
+
+        {/* Barras resumidas das 3 dimensões */}
+        <div className="space-y-1.5">
+          {dimensions.map((d) => {
+            const pct = d.max > 0 ? Math.round((d.value / d.max) * 100) : 0;
+            return (
+              <div key={d.label} className="flex items-center gap-2">
+                <span className="w-14 shrink-0 text-xs text-muted-foreground">{d.label}</span>
+                <Progress value={pct} className="h-1.5 flex-1" />
+                <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                  {d.value}/{d.max}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         <Separator />
 
-        <div className="space-y-4">
-          {dimensions.map((dimension) => (
-            <Dimension key={dimension.label} {...dimension} />
-          ))}
-        </div>
-
-        {desagioRec !== "Não recomendado" && (
-          <>
-            <Separator />
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Deságio recomendado</span>
-              <span className={`font-semibold ${text}`}>{desagioRec}</span>
-            </div>
-          </>
-        )}
+        {/* Collapsible com breakdown detalhado */}
+        <Collapsible open={open} onOpenChange={setOpen}>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between text-xs text-muted-foreground hover:text-foreground"
+            >
+              <span>Ver composição do score</span>
+              <ChevronDown className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3 space-y-4">
+            {dimensions.map((dimension) => (
+              <Dimension key={dimension.label} {...dimension} />
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
       </CardContent>
     </Card>
   );
@@ -353,7 +370,7 @@ export function ProspectDetailsCard({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <MapPin className={`size-4 ${tone === "emerald" ? "text-emerald-700" : "text-primary/70"}`} />
-          Detalhes do prospect
+          Perfil socioeconômico
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
