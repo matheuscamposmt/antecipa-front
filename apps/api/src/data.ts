@@ -129,6 +129,13 @@ export type CompanyDetail = {
   distributionByClasse: Array<{ classe: string; total: number; quantidade: number }>;
 };
 
+export type ClasseBreakdownItem = {
+  classe: string;
+  quantidade: number;
+  valorTotal: number;
+  empresas: number;
+};
+
 export type OverviewData = {
   loadedAt: string;
   totalEmpresas: number;
@@ -140,6 +147,7 @@ export type OverviewData = {
   topAdministradoresJudiciais: Array<{ nome: string; empresas: number }>;
   topClasses: Array<{ classe: string; quantidade: number }>;
   topEmpresasPorCredito: Array<{ nome: string; totalCredito: number }>;
+  classeBreakdown: ClasseBreakdownItem[];
 };
 
 const SALARIO_MINIMO = Number.parseFloat(process.env.SALARIO_MINIMO ?? "1518");
@@ -633,8 +641,48 @@ async function loadCompanyCreditors(company: CompanyItem): Promise<Omit<Creditor
   }));
 }
 
+async function loadClasseBreakdown(): Promise<ClasseBreakdownItem[]> {
+  const rows = await queryRows<{
+    classe: string | null;
+    quantidade: string | number;
+    valor_total: string | number;
+    empresas: string | number;
+  }>(
+    `
+      SELECT
+        classe,
+        COUNT(*) AS quantidade,
+        COALESCE(SUM(valor), 0) AS valor_total,
+        COUNT(DISTINCT nome_da_empresa) AS empresas
+      FROM administradores_judiciais.credores
+      GROUP BY classe
+    `,
+  );
+
+  // Normalize classe labels in JS (reuses existing normalizeClasse logic)
+  const map = new Map<string, ClasseBreakdownItem>();
+  for (const row of rows) {
+    const key = normalizeClasse(row.classe ?? "");
+    const existing = map.get(key) ?? { classe: key, quantidade: 0, valorTotal: 0, empresas: 0 };
+    existing.quantidade += Number.parseInt(String(row.quantidade ?? 0), 10) || 0;
+    existing.valorTotal += toNumber(row.valor_total);
+    // empresas is a distinct count per raw classe — approximate by taking max
+    existing.empresas = Math.max(existing.empresas, Number.parseInt(String(row.empresas ?? 0), 10) || 0);
+    map.set(key, existing);
+  }
+
+  return Array.from(map.values())
+    .filter((item) => ["I", "II", "III", "IV"].includes(item.classe))
+    .sort((a, b) => b.valorTotal - a.valorTotal);
+}
+
 export async function loadOverview(): Promise<OverviewData> {
-  const [loadedAt, companies, topClasses] = await Promise.all([loadLoadedAt(), loadCompanySummaries(), loadTopClasses()]);
+  const [loadedAt, companies, topClasses, classeBreakdown] = await Promise.all([
+    loadLoadedAt(),
+    loadCompanySummaries(),
+    loadTopClasses(),
+    loadClasseBreakdown(),
+  ]);
   const companiesWithCreditors = companies.filter((company) => company.quantidadeCredores > 0);
   const totalCreditAllCompanies = companiesWithCreditors.reduce((acc, company) => acc + company.totalCredito, 0);
   const totalPerCompany = companiesWithCreditors.map((item) => item.totalCredito).filter((value) => value > 0);
@@ -664,6 +712,7 @@ export async function loadOverview(): Promise<OverviewData> {
       .sort((a, b) => b.totalCredito - a.totalCredito)
       .slice(0, 10)
       .map((c) => ({ nome: c.nomeEmpresa, totalCredito: c.totalCredito })),
+    classeBreakdown,
   };
 }
 

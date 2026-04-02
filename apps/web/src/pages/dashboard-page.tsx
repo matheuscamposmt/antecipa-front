@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, Search, Tag } from "lucide-react";
 import { fetchCompanies, fetchOverview, type CompanyListResponse } from "@/lib/api";
 import type { Overview } from "@/types";
 import { CompanyCard } from "@/components/company-card";
@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function DashboardPage() {
@@ -26,6 +27,7 @@ export function DashboardPage() {
   const [creditMax, setCreditMax] = useState<number | null>(null);
   const [homologFrom, setHomologFrom] = useState("");
   const [homologTo, setHomologTo] = useState("");
+  const [classeFilter, setClasseFilter] = useState("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -90,7 +92,25 @@ export function DashboardPage() {
         </p>
       </div>
 
-      {loading && !overview ? <DashboardOverviewSkeleton /> : <SectionCards overview={overview} />}
+      {/* KPI filter by class */}
+      <div className="flex items-center gap-2">
+        <Tag className="size-3.5 shrink-0 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Filtrar KPIs por classe:</span>
+        <Select value={classeFilter} onValueChange={setClasseFilter}>
+          <SelectTrigger className="h-7 w-44 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as classes</SelectItem>
+            <SelectItem value="I">Trabalhista (I)</SelectItem>
+            <SelectItem value="II">Classe II</SelectItem>
+            <SelectItem value="III">Classe III</SelectItem>
+            <SelectItem value="IV">Classe IV</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {loading && !overview ? <DashboardOverviewSkeleton /> : <SectionCards overview={overview} classeFilter={classeFilter} />}
       {loading && !overview ? <DashboardChartsSkeleton /> : <OverviewCharts overview={overview} />}
 
       <section className="space-y-4">

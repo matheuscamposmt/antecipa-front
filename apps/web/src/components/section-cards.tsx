@@ -1,39 +1,81 @@
-import { Building2, Landmark, Scale, WalletCards } from "lucide-react";
+import { Building2, Landmark, Scale, Users, WalletCards } from "lucide-react";
 import type { Overview } from "@/types";
 import { brl, integer } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Props = {
   overview: Overview | null;
+  classeFilter?: string;
 };
 
-export function SectionCards({ overview }: Props) {
-  const cards = [
-    {
-      title: "Volume mapeado",
-      value: brl(overview?.valorTotalCredito ?? 0),
-      icon: Landmark,
-      sub: "créditos trabalhistas elegíveis",
-    },
-    {
-      title: "Empresas com credores",
-      value: integer(overview?.totalEmpresasComCredores ?? 0),
-      icon: Building2,
-      sub: `de ${integer(overview?.totalEmpresas ?? 0)} em recuperação judicial`,
-    },
-    {
-      title: "Total em recuperação",
-      value: integer(overview?.totalEmpresas ?? 0),
-      icon: Scale,
-      sub: "empresas monitoradas",
-    },
-    {
-      title: "Ticket médio",
-      value: brl(overview?.mediaValorPorEmpresa ?? 0),
-      icon: WalletCards,
-      sub: "por empresa com credores mapeados",
-    },
-  ];
+const CLASS_LABELS: Record<string, string> = {
+  I: "Trabalhista",
+  II: "Classe II",
+  III: "Classe III",
+  IV: "Classe IV",
+};
+
+export function SectionCards({ overview, classeFilter = "all" }: Props) {
+  const filtered =
+    classeFilter !== "all"
+      ? (overview?.classeBreakdown ?? []).find((b) => b.classe === classeFilter)
+      : null;
+
+  const classeSuffix = filtered ? ` · ${CLASS_LABELS[classeFilter] ?? classeFilter}` : "";
+
+  const cards = filtered
+    ? [
+        {
+          title: "Volume mapeado",
+          value: brl(filtered.valorTotal),
+          icon: Landmark,
+          sub: `créditos ${CLASS_LABELS[classeFilter] ?? classeFilter}${classeSuffix ? "" : " elegíveis"}`,
+        },
+        {
+          title: "Credores mapeados",
+          value: integer(filtered.quantidade),
+          icon: Users,
+          sub: `credores de ${CLASS_LABELS[classeFilter] ?? classeFilter}`,
+        },
+        {
+          title: "Empresas com essa classe",
+          value: integer(filtered.empresas),
+          icon: Building2,
+          sub: "empresas com credores desta classe",
+        },
+        {
+          title: "Ticket médio",
+          value: filtered.quantidade > 0 ? brl(filtered.valorTotal / filtered.quantidade) : "—",
+          icon: WalletCards,
+          sub: `valor médio por credor ${CLASS_LABELS[classeFilter] ?? classeFilter}`,
+        },
+      ]
+    : [
+        {
+          title: "Volume mapeado",
+          value: brl(overview?.valorTotalCredito ?? 0),
+          icon: Landmark,
+          sub: "créditos trabalhistas elegíveis",
+        },
+        {
+          title: "Empresas com credores",
+          value: integer(overview?.totalEmpresasComCredores ?? 0),
+          icon: Building2,
+          sub: `de ${integer(overview?.totalEmpresas ?? 0)} em recuperação judicial`,
+        },
+        {
+          title: "Total em recuperação",
+          value: integer(overview?.totalEmpresas ?? 0),
+          icon: Scale,
+          sub: "empresas monitoradas",
+        },
+        {
+          title: "Ticket médio",
+          value: brl(overview?.mediaValorPorEmpresa ?? 0),
+          icon: WalletCards,
+          sub: "por empresa com credores mapeados",
+        },
+      ];
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
