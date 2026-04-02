@@ -85,29 +85,29 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Recuperação Judicial</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Credores trabalhistas mapeados por score · Lei 11.101/2005
-        </p>
-      </div>
-
-      {/* KPI filter by class */}
-      <div className="flex items-center gap-2">
-        <Tag className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Filtrar KPIs por classe:</span>
-        <Select value={classeFilter} onValueChange={setClasseFilter}>
-          <SelectTrigger className="h-7 w-44 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as classes</SelectItem>
-            <SelectItem value="I">Trabalhista (I)</SelectItem>
-            <SelectItem value="II">Classe II</SelectItem>
-            <SelectItem value="III">Classe III</SelectItem>
-            <SelectItem value="IV">Classe IV</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Recuperação Judicial</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Credores trabalhistas mapeados por score · Lei 11.101/2005
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Tag className="size-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground hidden sm:inline">Classe:</span>
+          <Select value={classeFilter} onValueChange={setClasseFilter}>
+            <SelectTrigger className="h-9 w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as classes</SelectItem>
+              <SelectItem value="I">Trabalhista (I)</SelectItem>
+              <SelectItem value="II">Classe II</SelectItem>
+              <SelectItem value="III">Classe III</SelectItem>
+              <SelectItem value="IV">Classe IV</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {loading && !overview ? <DashboardOverviewSkeleton /> : <SectionCards overview={overview} classeFilter={classeFilter} />}
