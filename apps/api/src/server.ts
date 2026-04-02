@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { z } from "zod";
-import { loadCompanies, loadCompanyDetail, loadCredorPhones, loadCredorRJDetail, loadOverview, type CompanyItem } from "./data.js";
+import { loadCompanies, loadCompanyDetail, loadCredorParentes, loadCredorPhones, loadCredorRJDetail, loadOverview, type CompanyItem } from "./data.js";
 import { hasRedshiftConfigured } from "./redshift.js";
 import { loadCredorPrecatorioDetail, loadPrecatorioDebtors, loadPrecatorioDetail, loadPrecatorioOverview, loadProcessoDetail } from "./precatorios-data.js";
 
@@ -104,6 +104,16 @@ server.get("/api/credores/rj/:hash/phones", async (request, reply) => {
     return reply.code(404).send({ error: "Credor não encontrado" });
   }
   return { telefones };
+});
+
+server.get("/api/credores/rj/:hash/parentes", async (request, reply) => {
+  const paramsSchema = z.object({ hash: z.string().min(1) });
+  const { hash } = paramsSchema.parse(request.params);
+  const result = await loadCredorParentes(hash);
+  if (!result) {
+    return reply.code(404).send({ error: "Credor não encontrado" });
+  }
+  return result;
 });
 
 server.get("/api/credores/precatorio/:numeroProcesso/:credorNome", async (request, reply) => {

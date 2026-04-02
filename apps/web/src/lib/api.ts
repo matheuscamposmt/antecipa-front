@@ -71,6 +71,24 @@ export async function fetchCredorRJPhones(hash: string): Promise<string[]> {
   return result.telefones;
 }
 
+export type CredorParentesResponse = {
+  credorNome: string;
+  parentes: Array<{
+    nome: string;
+    cpfMasked: string;
+    municipio: string;
+    uf: string;
+    rendaAnualEstimada: number | null;
+    rendaAnoReferencia: number | null;
+    beneficiarioProgramaSocial: boolean;
+    programaSocialDescricao: string;
+  }>;
+};
+
+export async function fetchCredorParentes(hash: string): Promise<CredorParentesResponse> {
+  return getJson<CredorParentesResponse>(`/api/credores/rj/${hash}/parentes`);
+}
+
 export async function fetchCredorPrecatorioDetail(
   numeroProcesso: string,
   credorNome: string,

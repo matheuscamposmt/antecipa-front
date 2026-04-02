@@ -865,4 +865,128 @@ export async function loadCredorPhones(hash: string): Promise<string[]> {
   return phoneMap.get(normalizeNameForMatch(nome)) ?? [];
 }
 
+export type ParenteItem = {
+  nome: string;
+  cpfMasked: string;
+  municipio: string;
+  uf: string;
+  rendaAnualEstimada: number | null;
+  rendaAnoReferencia: number | null;
+  beneficiarioProgramaSocial: boolean;
+  programaSocialDescricao: string;
+};
+
+export type ParentesResult = {
+  credorNome: string;
+  parentes: ParenteItem[];
+};
+
+// Extract last word of a name as the surname for matching
+function extractSobrenome(nome: string): string {
+  const parts = nome.trim().split(/\s+/);
+  return parts.length > 1 ? (parts[parts.length - 1] ?? "") : "";
+}
+
+function maskCpf(cpf: string): string {
+  const digits = cpf.replace(/\D/g, "");
+  if (digits.length !== 11) return "***.***.***-**";
+  return `${digits.slice(0, 3)}.***.***-${digits.slice(9)}`;
+}
+
+export async function loadCredorParentes(hash: string): Promise<ParentesResult | null> {
+  const credorRows = await queryRows<{ nome: string; cpf_cnpj: string | null }>(
+    `SELECT nome, cpf_cnpj FROM administradores_judiciais.credores WHERE row_hash = $1 LIMIT 1`,
+    [hash],
+  );
+  if (credorRows.length === 0) return null;
+
+  const credorNome = credorRows[0]!.nome;
+  const cpf = (credorRows[0]!.cpf_cnpj ?? "").replace(/\D/g, "");
+
+  // Only PF (11-digit CPF) has reliable family data
+  if (cpf.length !== 11) {
+    return { credorNome, parentes: [] };
+  }
+
+  // 1. Get creditor's address from Receita Federal
+  const pfRows = await queryRows<{ cep: string | null; municipio: string | null; uf: string | null }>(
+    `SELECT cep, municipio, uf FROM receita_federal.pessoa_fisica WHERE cpf = $1 LIMIT 1`,
+    [cpf],
+  ).catch(() => []);
+
+  const cep = (pfRows[0]?.cep ?? "").replace(/\D/g, "");
+  const municipio = pfRows[0]?.municipio ?? "";
+
+  if (!cep && !municipio) {
+    return { credorNome, parentes: [] };
+  }
+
+  const sobrenome = normalizeNameForMatch(extractSobrenome(credorNome));
+  if (!sobrenome || sobrenome.length < 3) {
+    return { credorNome, parentes: [] };
+  }
+
+  // 2. Find people at same address with same surname (potential family)
+  type PfRelRow = { cpf: string; nome: string; municipio: string | null; uf: string | null };
+  const condition = cep
+    ? `REGEXP_REPLACE(COALESCE(cep, ''), '\\\\D', '') = $2`
+    : `UPPER(TRIM(municipio)) = UPPER(TRIM($2))`;
+  const conditionValue = cep || municipio;
+
+  const relRows = await queryRows<PfRelRow>(
+    `
+      SELECT cpf, nome, municipio, uf
+      FROM receita_federal.pessoa_fisica
+      WHERE cpf != $1
+        AND ${condition}
+        AND UPPER(TRIM(nome)) LIKE '%' || $3 || '%'
+      LIMIT 20
+    `,
+    [cpf, conditionValue, sobrenome],
+  ).catch(() => [] as PfRelRow[]);
+
+  if (relRows.length === 0) {
+    return { credorNome, parentes: [] };
+  }
+
+  // 3. For each relative, fetch income and social program in parallel
+  const parentes: ParenteItem[] = await Promise.all(
+    relRows.map(async (rel) => {
+      const relCpf = rel.cpf.replace(/\D/g, "");
+
+      const [rendaRows, benefitRows] = await Promise.all([
+        queryRows<{ ganho: string | number; ano: string | number }>(
+          `SELECT ganho, ano FROM renda.ganho_anual_pf_emprego WHERE cpf = $1 ORDER BY ano DESC LIMIT 1`,
+          [relCpf],
+        ).catch(() => []),
+        queryRows<{ ano_referencia: string | number | null; beneficios: string | null }>(
+          `
+            SELECT MAX(ano_referencia) AS ano_referencia,
+                   LISTAGG(DISTINCT nome_beneficio, ', ') WITHIN GROUP (ORDER BY nome_beneficio) AS beneficios
+            FROM transparencia.beneficiarios_sociais_resultado_por_ano
+            WHERE cpf = $1
+              AND ano_referencia = (SELECT MAX(ano_referencia) FROM transparencia.beneficiarios_sociais_resultado_por_ano WHERE cpf = $1)
+          `,
+          [relCpf],
+        ).catch(() => []),
+      ]);
+
+      const isBeneficiary = benefitRows.length > 0 && benefitRows[0]?.ano_referencia != null;
+
+      return {
+        nome: rel.nome,
+        cpfMasked: maskCpf(relCpf),
+        municipio: rel.municipio ?? "",
+        uf: rel.uf ?? "",
+        rendaAnualEstimada: rendaRows.length > 0 ? toNumber(rendaRows[0]?.ganho) : null,
+        rendaAnoReferencia: rendaRows.length > 0 ? Number.parseInt(String(rendaRows[0]?.ano ?? 0), 10) || null : null,
+        beneficiarioProgramaSocial: isBeneficiary,
+        programaSocialDescricao: (benefitRows[0]?.beneficios ?? "").trim(),
+      };
+    }),
+  );
+
+  return { credorNome, parentes };
+}
+
 export { buildCompanySlug };

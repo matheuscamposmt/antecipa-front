@@ -7,12 +7,14 @@ import {
   ChevronRight,
   ExternalLink,
   FileText,
+  Loader2,
   Phone,
   ShieldAlert,
   ShieldCheck,
+  Users,
   User,
 } from "lucide-react";
-import { fetchCredorRJDetail, fetchCredorRJPhones } from "@/lib/api";
+import { fetchCredorParentes, fetchCredorRJDetail, fetchCredorRJPhones, type CredorParentesResponse } from "@/lib/api";
 import { brl } from "@/lib/format";
 import type { CredorRJDetail, DetailScoreBreakdown } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -37,6 +39,9 @@ export function CredorRJPage() {
   const [error, setError] = useState("");
   const [telefones, setTelefones] = useState<string[]>([]);
   const [phonesLoading, setPhonesLoading] = useState(false);
+  const [parentes, setParentes] = useState<CredorParentesResponse | null>(null);
+  const [parentesLoading, setParentesLoading] = useState(false);
+  const [parentesTriggered, setParentesTriggered] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +74,20 @@ export function CredorRJPage() {
     void run();
     return () => { cancelled = true; };
   }, [hash]);
+
+  async function handleLoadParentes() {
+    if (parentesTriggered) return;
+    setParentesTriggered(true);
+    setParentesLoading(true);
+    try {
+      const result = await fetchCredorParentes(hash);
+      setParentes(result);
+    } catch {
+      // non-fatal
+    } finally {
+      setParentesLoading(false);
+    }
+  }
 
   if (loading) return <CredorSkeleton />;
 
@@ -220,6 +239,16 @@ export function CredorRJPage() {
       {/* ── Perfil socioeconômico ── */}
       <ProspectDetailsCard details={detail.prospectDetails} />
 
+      {/* ── Vínculos familiares ── */}
+      {detail.tipoPessoa === "PF" && (
+        <ParentesSection
+          parentes={parentes}
+          loading={parentesLoading}
+          triggered={parentesTriggered}
+          onLoad={handleLoadParentes}
+        />
+      )}
+
       {/* ── Empresa ── */}
       <Card className="border-border">
         <CardHeader className="pb-3">
@@ -299,6 +328,87 @@ export function CredorRJPage() {
         </Card>
       ) : null}
     </div>
+  );
+}
+
+function ParentesSection({
+  parentes,
+  loading,
+  triggered,
+  onLoad,
+}: {
+  parentes: CredorParentesResponse | null;
+  loading: boolean;
+  triggered: boolean;
+  onLoad: () => void;
+}) {
+  return (
+    <Card className="border-border">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Users className="size-4 text-primary/70" />
+          Vínculos familiares
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Consulta por pessoas com mesmo sobrenome e endereço — beneficiários sociais e renda estimada.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {!triggered && (
+          <button
+            type="button"
+            onClick={onLoad}
+            className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <Users className="size-3.5" />
+            Consultar vínculos familiares
+          </button>
+        )}
+
+        {loading && (
+          <div className="flex items-center gap-3 py-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" />
+            Consultando base de dados — isso pode levar alguns segundos…
+          </div>
+        )}
+
+        {!loading && triggered && parentes && parentes.parentes.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            Nenhum vínculo familiar identificado pelo endereço e sobrenome.
+          </p>
+        )}
+
+        {!loading && parentes && parentes.parentes.length > 0 && (
+          <div className="divide-y">
+            {parentes.parentes.map((p) => (
+              <div key={p.cpfMasked} className="flex items-start justify-between gap-4 py-3 first:pt-0 last:pb-0">
+                <div className="min-w-0 space-y-0.5">
+                  <p className="font-medium truncate">{p.nome}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {p.cpfMasked} · {[p.municipio, p.uf].filter(Boolean).join(" / ")}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right space-y-0.5">
+                  {p.rendaAnualEstimada != null && (
+                    <p className="text-sm font-semibold">
+                      {brl(p.rendaAnualEstimada)}
+                      {p.rendaAnoReferencia ? <span className="ml-1 text-xs font-normal text-muted-foreground">/{p.rendaAnoReferencia}</span> : null}
+                    </p>
+                  )}
+                  {p.beneficiarioProgramaSocial ? (
+                    <span className="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[11px] font-medium text-warning">
+                      {p.programaSocialDescricao || "Beneficiário social"}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">Sem benefício social</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
