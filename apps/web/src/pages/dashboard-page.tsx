@@ -86,7 +86,7 @@ export function DashboardPage() {
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Recuperação Judicial</h1>
         <p className="mt-0.5 text-sm text-muted-foreground">
-          Credores mapeados por score · Classe I · Lei 11.101/2005
+          Credores trabalhistas mapeados por score · Lei 11.101/2005
         </p>
       </div>
 

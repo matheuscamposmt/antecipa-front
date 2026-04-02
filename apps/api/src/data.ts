@@ -250,7 +250,7 @@ function computeAtivoDimension(creditor: {
     method: "regras_rj",
     note: "Classe, documento e observações do AJ.",
     items: [
-      { label: "Classe I (trabalhista)", pts: classeScore, max: 20 },
+      { label: "Classe Trabalhista", pts: classeScore, max: 20 },
       { label: "Documento válido", pts: documentoScore, max: 12 },
       { label: "Sem contestação (AJ)", pts: sinaisScore, max: 8 },
     ],
@@ -339,9 +339,9 @@ async function scoreCredorRJDetail(creditor: {
         ativo: {
           total: 0,
           method: "fora_criterio",
-          note: "Somente créditos Classe I elegíveis entram no score de originação.",
+          note: "Somente créditos trabalhistas elegíveis entram no score de originação.",
           items: [
-            { label: "Classe I (trabalhista)", pts: 0, max: 20 },
+            { label: "Classe Trabalhista", pts: 0, max: 20 },
             { label: "Documento válido", pts: 0, max: 12 },
             { label: "Sem contestação (AJ)", pts: 0, max: 8 },
           ],

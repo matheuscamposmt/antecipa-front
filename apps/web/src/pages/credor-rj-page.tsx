@@ -7,6 +7,7 @@ import {
   ChevronRight,
   ExternalLink,
   FileText,
+  Phone,
   ShieldAlert,
   ShieldCheck,
   User,
@@ -25,7 +26,6 @@ import {
   PhonesSection,
   ProspectDetailsCard,
   ProspectStatusBadge,
-  parseDesagioRange,
 } from "@/components/creditor-detail-shared";
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -97,145 +97,128 @@ export function CredorRJPage() {
           .map(([key, val]) => ({
             label: key.replace(/_/g, " "),
             value: String(val ?? "").replace(/\n/g, " ").trim() || "—",
-          }))
-          .filter(({ value }) => value !== "—" || true);
+          }));
       }
     } catch {
-      // not JSON — ignore, show nothing
+      // not JSON — ignore
     }
     return [];
   })();
 
-  const desagioRange = parseDesagioRange(detail.desagioRec);
+  const classeLabel = detail.classe === "I" ? "Trabalhista" : `Classe ${detail.classe}`;
 
   return (
-    <div className="space-y-6 p-4 lg:p-6">
+    <div className="space-y-4 p-4 lg:p-6">
       {/* ── Header ── */}
-      <section className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1 space-y-2">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            Credor · Recuperação Judicial
-          </p>
-          <h1 className="text-2xl font-bold leading-tight lg:text-3xl">{detail.nome}</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={detail.tipoPessoa === "PF" ? "default" : "secondary"}>
-              <User className="mr-1 size-3" />
-              {detail.tipoPessoa === "PF"
-                ? "Pessoa Física"
-                : detail.tipoPessoa === "PJ"
-                ? "Pessoa Jurídica"
-                : "Não identificado"}
-            </Badge>
-            {detail.cpfCnpj ? <Badge variant="outline">{detail.cpfCnpj}</Badge> : null}
-            <Badge variant="outline">Classe {detail.classe}</Badge>
-            <ProspectStatusBadge status={detail.status} elegivel={detail.elegivel} />
-          </div>
-
-          {/* Phones — inline with name block */}
-          <PhonesSection telefones={telefones} loading={phonesLoading} nome={detail.nome} />
+      <section className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+          Credor · Recuperação Judicial
+        </p>
+        <h1 className="text-2xl font-bold leading-tight lg:text-3xl">{detail.nome}</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={detail.tipoPessoa === "PF" ? "default" : "secondary"}>
+            <User className="mr-1 size-3" />
+            {detail.tipoPessoa === "PF"
+              ? "Pessoa Física"
+              : detail.tipoPessoa === "PJ"
+              ? "Pessoa Jurídica"
+              : "Não identificado"}
+          </Badge>
+          {detail.cpfCnpj ? <Badge variant="outline">{detail.cpfCnpj}</Badge> : null}
+          <Badge variant="outline">{classeLabel}</Badge>
+          <ProspectStatusBadge status={detail.status} elegivel={detail.elegivel} />
         </div>
       </section>
 
-      {/* ── Main grid: Ficha (2/3) + Score (1/3) ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {/* ── Score (full width — produto principal) ── */}
+      <ScoreCard
+        score={detail.score}
+        scoreAtivo={detail.scoreAtivo}
+        scoreDevedor={detail.scoreDevedor}
+        scoreCredit={detail.scoreCredit}
+        breakdown={detail.scoreBreakdown}
+      />
 
-        {/* Ficha do crédito */}
-        <Card className="lg:col-span-2 border-border">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="size-4 text-primary/70" />
-              Ficha do crédito
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
+      {/* ── Contatos ── */}
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Phone className="size-4 text-primary/70" />
+            Telefones e contato
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PhonesSection telefones={telefones} loading={phonesLoading} nome={detail.nome} />
+        </CardContent>
+      </Card>
 
-            {/* Valor + deságio em linha */}
-            <div className="flex flex-wrap items-end gap-6">
+      {/* ── Ficha do crédito ── */}
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileText className="size-4 text-primary/70" />
+            Ficha do crédito
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div>
+            <p className="text-xs text-muted-foreground">Valor nominal do crédito</p>
+            <p className="text-3xl font-bold tracking-tight">{brl(detail.valor)}</p>
+          </div>
+
+          <Separator />
+
+          <dl className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3">
+            <InfoField
+              label="Tipo de pessoa"
+              value={
+                detail.tipoPessoa === "PF" ? "Pessoa Física" :
+                detail.tipoPessoa === "PJ" ? "Pessoa Jurídica" : "—"
+              }
+            />
+            <InfoField label="CPF / CNPJ" value={detail.cpfCnpj || "Não informado"} />
+            <InfoField label="Classe do crédito" value={classeLabel} />
+            <InfoField label="Moeda" value={detail.moeda || "BRL"} />
+            <InfoField
+              label="Elegível FIDC-NP"
+              value={detail.elegivel ? "Sim" : "Não"}
+              valueClassName={detail.elegivel ? "text-primary font-semibold" : "text-muted-foreground"}
+            />
+            <InfoField
+              label="Prioridade legal"
+              value={
+                detail.classe === "I" ? "Alta — Trabalhista" :
+                detail.classe === "II" ? "Média — Garantia Real" : "Baixa"
+              }
+            />
+            {extraFields.map(({ label, value }) => (
+              <InfoField key={label} label={label} value={value} />
+            ))}
+          </dl>
+
+          {hasRisco && (
+            <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3">
+              <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
               <div>
-                <p className="text-xs text-muted-foreground">Valor nominal do crédito</p>
-                <p className="text-3xl font-bold tracking-tight">{brl(detail.valor)}</p>
+                <p className="text-sm font-semibold text-warning">Atenção: sinais de contestação</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  A observação do AJ contém termos de impugnação, contestação ou reserva. Avaliar com cautela.
+                </p>
               </div>
-              {desagioRange && (
-                <div className="space-y-0.5 pb-1">
-                  <p className="text-xs text-muted-foreground">
-                    Deságio recomendado:{" "}
-                    <span className="font-semibold text-foreground">{detail.desagioRec}</span>
-                  </p>
-                  <p className="text-sm">
-                    <span className="text-muted-foreground">Valor líquido estimado: </span>
-                    <span className="font-semibold text-primary">
-                      {desagioRange[0] === desagioRange[1]
-                        ? brl(detail.valor * (1 - desagioRange[0] / 100))
-                        : `${brl(detail.valor * (1 - desagioRange[0] / 100))} – ${brl(detail.valor * (1 - desagioRange[1] / 100))}`}
-                    </span>
-                  </p>
-                </div>
-              )}
             </div>
+          )}
 
-            <Separator />
+          {!hasRisco && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <ShieldCheck className="size-3.5 text-primary" />
+              Sem sinais de contestação nas observações do Administrador Judicial
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-            {/* Dados cadastrais */}
-            <dl className="grid grid-cols-2 gap-x-8 gap-y-4 sm:grid-cols-3">
-              <InfoField
-                label="Tipo de pessoa"
-                value={
-                  detail.tipoPessoa === "PF" ? "Pessoa Física" :
-                  detail.tipoPessoa === "PJ" ? "Pessoa Jurídica" : "—"
-                }
-              />
-              <InfoField label="CPF / CNPJ" value={detail.cpfCnpj || "Não informado"} />
-              <InfoField label="Classe do crédito" value={`Classe ${detail.classe}`} />
-              <InfoField label="Moeda" value={detail.moeda || "BRL"} />
-              <InfoField
-                label="Elegível FIDC-NP"
-                value={detail.elegivel ? "Sim" : "Não"}
-                valueClassName={detail.elegivel ? "text-primary font-semibold" : "text-muted-foreground"}
-              />
-              <InfoField
-                label="Prioridade legal"
-                value={
-                  detail.classe === "I" ? "Alta — Trabalhista" :
-                  detail.classe === "II" ? "Média — Garantia Real" : "Baixa"
-                }
-              />
-              {extraFields.map(({ label, value }) => (
-                <InfoField key={label} label={label} value={value} />
-              ))}
-            </dl>
-
-            {/* Indicador de risco — apenas quando há sinal */}
-            {hasRisco && (
-              <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-3">
-                <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
-                <div>
-                  <p className="text-sm font-semibold text-warning">Atenção: sinais de contestação</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    A observação do AJ contém termos de impugnação, contestação ou reserva. Avaliar com cautela.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {!hasRisco && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <ShieldCheck className="size-3.5 text-primary" />
-                Sem sinais de contestação nas observações do Administrador Judicial
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Score de Originação */}
-        <ScoreCard
-          score={detail.score}
-          scoreAtivo={detail.scoreAtivo}
-          scoreDevedor={detail.scoreDevedor}
-          scoreCredit={detail.scoreCredit}
-          desagioRec={detail.desagioRec}
-          breakdown={detail.scoreBreakdown}
-        />
-      </div>
+      {/* ── Perfil socioeconômico ── */}
+      <ProspectDetailsCard details={detail.prospectDetails} />
 
       {/* ── Empresa ── */}
       <Card className="border-border">
@@ -275,8 +258,6 @@ export function CredorRJPage() {
         </CardContent>
       </Card>
 
-      <ProspectDetailsCard details={detail.prospectDetails} />
-
       {/* ── Outros processos ── */}
       {detail.outrasEmpresas.length > 0 ? (
         <Card className="border-border">
@@ -300,7 +281,9 @@ export function CredorRJPage() {
                   <div className="ml-4 flex shrink-0 items-center gap-3">
                     <div className="text-right">
                       <p className="text-sm font-semibold">{brl(outra.valor)}</p>
-                      <p className="text-xs text-muted-foreground">Classe {outra.classe}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {outra.classe === "I" ? "Trabalhista" : `Classe ${outra.classe}`}
+                      </p>
                     </div>
                     <Link
                       to={`/credor/rj/${outra.rowHash}`}
@@ -324,20 +307,17 @@ function ScoreCard({
   scoreAtivo,
   scoreDevedor,
   scoreCredit,
-  desagioRec,
   breakdown,
 }: {
   score: number;
   scoreAtivo: number;
   scoreDevedor: number;
   scoreCredit: number;
-  desagioRec: string;
   breakdown: DetailScoreBreakdown;
 }) {
   return (
     <OriginationScoreCard
       score={score}
-      desagioRec={desagioRec}
       dimensions={[
         {
           label: "Ativo",
@@ -370,7 +350,7 @@ function ScoreCard({
 
 function CredorSkeleton() {
   return (
-    <div className="space-y-6 p-4 lg:p-6">
+    <div className="space-y-4 p-4 lg:p-6">
       <div className="space-y-2">
         <Skeleton className="h-3 w-28" />
         <Skeleton className="h-9 w-80" />
@@ -379,44 +359,28 @@ function CredorSkeleton() {
           <Skeleton className="h-6 w-28" />
           <Skeleton className="h-6 w-20" />
         </div>
+      </div>
+      <div className="rounded-xl border bg-card p-5 space-y-4">
+        <Skeleton className="h-16 w-24" />
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-3 w-full" />)}
+        </div>
+      </div>
+      <div className="rounded-xl border bg-card p-5 space-y-3">
+        <Skeleton className="h-4 w-32" />
         <div className="flex gap-2">
           <Skeleton className="h-9 w-36 rounded-lg" />
           <Skeleton className="h-9 w-36 rounded-lg" />
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-xl border bg-card p-5 space-y-4">
-          <div className="flex gap-6">
-            <Skeleton className="h-10 w-40" />
-            <div className="space-y-1.5">
-              <Skeleton className="h-3 w-32" />
-              <Skeleton className="h-5 w-44" />
-            </div>
-          </div>
-          <Skeleton className="h-px w-full" />
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="space-y-1">
-                <Skeleton className="h-3 w-20" />
-                <Skeleton className="h-4 w-28" />
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="rounded-xl border bg-card p-5 space-y-4">
-          <Skeleton className="h-12 w-20" />
-          <Skeleton className="h-2 w-full" />
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-16 w-full" />
-        </div>
-      </div>
-      <div className="rounded-xl border bg-card p-5 space-y-3">
-        <Skeleton className="h-4 w-44" />
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => (
+      <div className="rounded-xl border bg-card p-5 space-y-4">
+        <Skeleton className="h-10 w-40" />
+        <Skeleton className="h-px w-full" />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="space-y-1">
               <Skeleton className="h-3 w-20" />
-              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-28" />
             </div>
           ))}
         </div>

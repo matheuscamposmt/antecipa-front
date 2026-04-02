@@ -13,7 +13,7 @@ export function SectionCards({ overview }: Props) {
       title: "Volume mapeado",
       value: brl(overview?.valorTotalCredito ?? 0),
       icon: Landmark,
-      sub: "créditos Classe I elegíveis",
+      sub: "créditos trabalhistas elegíveis",
     },
     {
       title: "Empresas com credores",
