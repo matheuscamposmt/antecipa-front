@@ -1,0 +1,94 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775243542751,
+  "projectRoot": "/home/matheusdemattos/Desktop/aetos/antecipa/antecipa-app",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "pnpm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "pnpm build",
+    "testCommand": null,
+    "lintCommand": "pnpm lint",
+    "devCommand": "pnpm dev",
+    "scripts": {
+      "dev": "pnpm -r --parallel dev",
+      "dev:web": "pnpm --filter web dev",
+      "dev:api": "pnpm --filter api dev",
+      "build": "pnpm -r build",
+      "lint": "pnpm -r lint",
+      "typecheck": "pnpm -r typecheck"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "apps": {
+      "path": "apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775243542745,
+      "keyFiles": []
+    },
+    "apps/api": {
+      "path": "apps/api",
+      "purpose": "API routes",
+      "fileCount": 4,
+      "lastAccessed": 1775243542749,
+      "keyFiles": [
+        "eslint.config.js",
+        "package.json",
+        "tsconfig.json"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "apps/web/src/pages/credor-rj-page.tsx",
+      "accessCount": 13,
+      "lastAccessed": 1775244117624,
+      "type": "file"
+    },
+    {
+      "path": "apps/web/src/pages/credor-precatorio-page.tsx",
+      "accessCount": 11,
+      "lastAccessed": 1775244098143,
+      "type": "file"
+    },
+    {
+      "path": "apps/web/src/components/creditor-detail-shared.tsx",
+      "accessCount": 8,
+      "lastAccessed": 1775244110297,
+      "type": "directory"
+    },
+    {
+      "path": "apps/web/src",
+      "accessCount": 1,
+      "lastAccessed": 1775243651176,
+      "type": "directory"
+    }
+  ],
+  "userDirectives": []
+}

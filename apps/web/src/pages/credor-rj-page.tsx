@@ -4,6 +4,7 @@ import {
   AlertCircle,
   BadgeCheck,
   Building2,
+  ChevronDown,
   ChevronRight,
   ExternalLink,
   FileText,
@@ -16,18 +17,21 @@ import {
 } from "lucide-react";
 import { fetchCredorParentes, fetchCredorRJDetail, fetchCredorRJPhones, type CredorParentesResponse } from "@/lib/api";
 import { brl } from "@/lib/format";
-import type { CredorRJDetail, DetailScoreBreakdown } from "@/types";
+import type { CredorRJDetail } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   InfoField,
-  OriginationScoreCard,
   PhonesSection,
   ProspectDetailsCard,
   ProspectStatusBadge,
+  ScoreBreakdown,
+  scoreLabelText,
+  scoreTextColor,
 } from "@/components/creditor-detail-shared";
 
 // ── Main page ─────────────────────────────────────────────────────────────────
@@ -133,7 +137,56 @@ export function CredorRJPage() {
         <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
           Credor · Recuperação Judicial
         </p>
-        <h1 className="text-2xl font-bold leading-tight lg:text-3xl">{detail.nome}</h1>
+        <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold leading-tight lg:text-3xl">{detail.nome}</h1>
+            <div className="h-8 w-px shrink-0 bg-border" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-muted"
+                >
+                  <span className={`text-5xl font-bold tabular-nums leading-none ${scoreTextColor(detail.score)}`}>
+                    {detail.score}
+                  </span>
+                  <div className="text-left">
+                    <p className="text-[10px] leading-none text-muted-foreground">/100</p>
+                    <p className={`text-xs font-semibold ${scoreTextColor(detail.score)}`}>{scoreLabelText(detail.score)}</p>
+                  </div>
+                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72 p-3">
+                <p className="mb-3 text-xs font-medium text-muted-foreground">Composição do score</p>
+                <ScoreBreakdown dimensions={[
+                  {
+                    label: "Ativo",
+                    description: "Certeza jurídica e liquidez",
+                    value: detail.scoreAtivo,
+                    max: 40,
+                    items: detail.scoreBreakdown.ativo.items,
+                    note: detail.scoreBreakdown.ativo.note,
+                  },
+                  {
+                    label: "Devedor",
+                    description: "Capacidade de pagamento",
+                    value: detail.scoreDevedor,
+                    max: 35,
+                    items: detail.scoreBreakdown.devedor.items,
+                    note: detail.scoreBreakdown.devedor.note,
+                  },
+                  {
+                    label: "Credor",
+                    description: "Propensão à cessão",
+                    value: detail.scoreCredit,
+                    max: 25,
+                    items: detail.scoreBreakdown.credor.items,
+                    note: detail.scoreBreakdown.credor.note,
+                  },
+                ]} />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={detail.tipoPessoa === "PF" ? "default" : "secondary"}>
             <User className="mr-1 size-3" />
@@ -148,15 +201,6 @@ export function CredorRJPage() {
           <ProspectStatusBadge status={detail.status} elegivel={detail.elegivel} />
         </div>
       </section>
-
-      {/* ── Score (full width — produto principal) ── */}
-      <ScoreCard
-        score={detail.score}
-        scoreAtivo={detail.scoreAtivo}
-        scoreDevedor={detail.scoreDevedor}
-        scoreCredit={detail.scoreCredit}
-        breakdown={detail.scoreBreakdown}
-      />
 
       {/* ── Contatos ── */}
       <Card className="border-border">
@@ -412,51 +456,6 @@ function ParentesSection({
   );
 }
 
-function ScoreCard({
-  score,
-  scoreAtivo,
-  scoreDevedor,
-  scoreCredit,
-  breakdown,
-}: {
-  score: number;
-  scoreAtivo: number;
-  scoreDevedor: number;
-  scoreCredit: number;
-  breakdown: DetailScoreBreakdown;
-}) {
-  return (
-    <OriginationScoreCard
-      score={score}
-      dimensions={[
-        {
-          label: "Ativo",
-          description: "Certeza jurídica e liquidez",
-          value: scoreAtivo,
-          max: 40,
-          items: breakdown.ativo.items,
-          note: breakdown.ativo.note,
-        },
-        {
-          label: "Devedor",
-          description: "Capacidade de pagamento",
-          value: scoreDevedor,
-          max: 35,
-          items: breakdown.devedor.items,
-          note: breakdown.devedor.note,
-        },
-        {
-          label: "Credor",
-          description: "Propensão à cessão",
-          value: scoreCredit,
-          max: 25,
-          items: breakdown.credor.items,
-          note: breakdown.credor.note,
-        },
-      ]}
-    />
-  );
-}
 
 function CredorSkeleton() {
   return (

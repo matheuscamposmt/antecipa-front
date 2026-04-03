@@ -1,7 +1,6 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode } from "react";
 import {
   ArrowUpRight,
-  ChevronDown,
   MapPin,
   Phone,
   Send,
@@ -12,7 +11,6 @@ import type { ProspectDetails, ProspectStatus } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import {
   Sheet,
@@ -21,7 +19,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function formatPhone(raw: string): string {
@@ -169,13 +166,13 @@ export function PhonesSection({
   );
 }
 
-function scoreColor(score: number) {
-  if (score >= 65) return { text: "text-primary", bg: "bg-primary/5", ring: "border-primary/20" };
-  if (score >= 50) return { text: "text-warning", bg: "bg-warning/5", ring: "border-warning/20" };
-  return { text: "text-muted-foreground", bg: "bg-muted/30", ring: "border-border" };
+export function scoreTextColor(score: number): string {
+  if (score >= 65) return "text-primary";
+  if (score >= 50) return "text-warning";
+  return "text-muted-foreground";
 }
 
-function scoreLabelText(score: number) {
+export function scoreLabelText(score: number): string {
   if (score >= 75) return "Excelente";
   if (score >= 65) return "Bom";
   if (score >= 50) return "Regular";
@@ -183,132 +180,48 @@ function scoreLabelText(score: number) {
   return "Muito fraco";
 }
 
-function Dimension({
-  label,
-  description,
-  value,
-  max,
-  items,
-  note,
-}: {
+type ScoreDimension = {
   label: string;
   description: string;
   value: number;
   max: number;
   items: Array<{ label: string; pts: number; max: number }>;
   note?: string;
-}) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+};
+
+export function ScoreBreakdown({ dimensions }: { dimensions: ScoreDimension[] }) {
   return (
-    <div className="space-y-2">
-      <div className="flex items-baseline justify-between">
-        <div>
-          <span className="text-sm font-semibold">{label}</span>
-          <span className="ml-1.5 text-xs text-muted-foreground">{description}</span>
-        </div>
-        <span className="text-xs font-bold tabular-nums">
-          {value}
-          <span className="font-normal text-muted-foreground">/{max}</span>
-        </span>
-      </div>
-      <Progress value={pct} className="h-1.5" />
-      <dl className="space-y-1 pl-1">
-        {items.map((item) => (
-          <div key={item.label} className="flex items-center justify-between text-[11px]">
-            <dt className="text-muted-foreground">{item.label}</dt>
-            <dd className="tabular-nums font-medium">
-              {item.pts}
-              <span className="font-normal text-muted-foreground">/{item.max}</span>
-            </dd>
+    <div className="space-y-3">
+      {dimensions.map((d) => {
+        const pct = d.max > 0 ? Math.round((d.value / d.max) * 100) : 0;
+        return (
+          <div key={d.label} className="space-y-1">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs font-semibold">{d.label}</span>
+                <span className="ml-1.5 text-[11px] text-muted-foreground">{d.description}</span>
+              </div>
+              <span className="text-xs tabular-nums font-medium">
+                {d.value}<span className="font-normal text-muted-foreground">/{d.max}</span>
+              </span>
+            </div>
+            <Progress value={pct} className="h-1" />
+            <dl className="space-y-0.5">
+              {d.items.map((item) => (
+                <div key={item.label} className="flex items-center justify-between text-[11px]">
+                  <dt className="text-muted-foreground">{item.label}</dt>
+                  <dd className="tabular-nums font-medium">
+                    {item.pts}<span className="font-normal text-muted-foreground">/{item.max}</span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {d.note ? <p className="text-[10px] italic text-muted-foreground/60">{d.note}</p> : null}
           </div>
-        ))}
-      </dl>
-      {note ? (
-        <p className="text-[10px] italic text-muted-foreground/60">{note}</p>
-      ) : null}
+        );
+      })}
     </div>
   );
-}
-
-export function OriginationScoreCard({
-  score,
-  dimensions,
-  tone = "default",
-}: {
-  score: number;
-  desagioRec?: string;
-  dimensions: Array<{
-    label: string;
-    description: string;
-    value: number;
-    max: number;
-    items: Array<{ label: string; pts: number; max: number }>;
-    note?: string;
-  }>;
-  tone?: "default" | "emerald";
-}) {
-  const [open, setOpen] = useState(false);
-  const { text, bg, ring } = tone === "emerald" ? emeraldScoreColor(score) : scoreColor(score);
-
-  return (
-    <Card className={`border ${ring} ${bg}`}>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Score de originação</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Score prominente */}
-        <div className="flex items-end gap-3">
-          <span className={`text-6xl font-bold leading-none tabular-nums ${text}`}>{score}</span>
-          <div className="mb-1 space-y-0.5">
-            <p className="text-sm leading-none text-muted-foreground">/100</p>
-            <p className={`text-sm font-semibold ${text}`}>{scoreLabelText(score)}</p>
-          </div>
-        </div>
-
-        {/* Barras resumidas das 3 dimensões */}
-        <div className="space-y-1.5">
-          {dimensions.map((d) => {
-            const pct = d.max > 0 ? Math.round((d.value / d.max) * 100) : 0;
-            return (
-              <div key={d.label} className="flex items-center gap-2">
-                <span className="w-14 shrink-0 text-xs text-muted-foreground">{d.label}</span>
-                <Progress value={pct} className="h-1.5 flex-1" />
-                <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
-                  {d.value}/{d.max}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
-        <Separator />
-
-        {/* Collapsible com breakdown detalhado */}
-        <Collapsible open={open} onOpenChange={setOpen}>
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="flex w-full items-center justify-between text-xs text-muted-foreground hover:text-foreground"
-            >
-              <span>Ver composição do score</span>
-              <ChevronDown className={`size-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3 space-y-4">
-            {dimensions.map((dimension) => (
-              <Dimension key={dimension.label} {...dimension} />
-            ))}
-          </CollapsibleContent>
-        </Collapsible>
-      </CardContent>
-    </Card>
-  );
-}
-
-function emeraldScoreColor(score: number) {
-  if (score >= 65) return { text: "text-emerald-700", bg: "bg-emerald-50/80", ring: "border-emerald-200/80" };
-  if (score >= 50) return { text: "text-teal-700", bg: "bg-teal-50/80", ring: "border-teal-200/80" };
-  return { text: "text-slate-600", bg: "bg-slate-50/80", ring: "border-slate-200/80" };
 }
 
 export function ProspectStatusBadge({
