@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, Search, Tag } from "lucide-react";
 import { fetchCompanies, fetchOverview, type CompanyListResponse } from "@/lib/api";
 import type { Overview } from "@/types";
 import { CompanyCard } from "@/components/company-card";
@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function DashboardPage() {
@@ -22,10 +23,11 @@ export function DashboardPage() {
   const [search, setSearch] = useState("");
   const [creditMinInput, setCreditMinInput] = useState("");
   const [creditMaxInput, setCreditMaxInput] = useState("");
-  const [creditMinApplied, setCreditMinApplied] = useState<number | null>(null);
-  const [creditMaxApplied, setCreditMaxApplied] = useState<number | null>(null);
+  const [creditMin, setCreditMin] = useState<number | null>(null);
+  const [creditMax, setCreditMax] = useState<number | null>(null);
   const [homologFrom, setHomologFrom] = useState("");
   const [homologTo, setHomologTo] = useState("");
+  const [classeFilter, setClasseFilter] = useState("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -40,6 +42,8 @@ export function DashboardPage() {
             pageSize: 30,
             search,
             onlyWithCreditors,
+            creditMin,
+            creditMax,
           }),
         ]);
         if (!cancelled) {
@@ -60,7 +64,7 @@ export function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [search, page, onlyWithCreditors]);
+  }, [search, page, onlyWithCreditors, creditMin, creditMax]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -72,24 +76,41 @@ export function DashboardPage() {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      const min = parseMoneyInput(creditMinInput);
-      const max = parseMoneyInput(creditMaxInput);
-      setCreditMinApplied(min);
-      setCreditMaxApplied(max);
-    }, 250);
+      setCreditMin(parseMoneyInput(creditMinInput));
+      setCreditMax(parseMoneyInput(creditMaxInput));
+      setPage(1);
+    }, 400);
     return () => clearTimeout(timeout);
   }, [creditMinInput, creditMaxInput]);
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Recuperação Judicial</h1>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          Credores mapeados por score · Classe I · Lei 11.101/2005
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Recuperação Judicial</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Credores trabalhistas mapeados por score · Lei 11.101/2005
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Tag className="size-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground hidden sm:inline">Classe:</span>
+          <Select value={classeFilter} onValueChange={setClasseFilter}>
+            <SelectTrigger className="h-9 w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as classes</SelectItem>
+              <SelectItem value="I">Trabalhista (I)</SelectItem>
+              <SelectItem value="II">Classe II</SelectItem>
+              <SelectItem value="III">Classe III</SelectItem>
+              <SelectItem value="IV">Classe IV</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {loading && !overview ? <DashboardOverviewSkeleton /> : <SectionCards overview={overview} />}
+      {loading && !overview ? <DashboardOverviewSkeleton /> : <SectionCards overview={overview} classeFilter={classeFilter} />}
       {loading && !overview ? <DashboardChartsSkeleton /> : <OverviewCharts overview={overview} />}
 
       <section className="space-y-4">

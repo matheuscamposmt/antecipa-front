@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   type ColumnDef,
@@ -44,15 +44,31 @@ function StatusBadgeInline({ status, elegivel }: { status: Creditor["status"]; e
   return <span className="inline-flex items-center rounded-md border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">Rejeitado</span>;
 }
 
+function parseMoneyInput(value: string): number | null {
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  const normalized = cleaned.replace(/\./g, "").replace(",", ".");
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function CreditorsTable({ data, companySlug }: Props) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "score", desc: true }]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [minValor, setMinValor] = useState("");
-  const [maxValor, setMaxValor] = useState("");
-  const min = parseMoneyInput(minValor);
-  const max = parseMoneyInput(maxValor);
+  const [minValorInput, setMinValorInput] = useState("");
+  const [maxValorInput, setMaxValorInput] = useState("");
+  const [min, setMin] = useState<number | null>(null);
+  const [max, setMax] = useState<number | null>(null);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setMin(parseMoneyInput(minValorInput));
+      setMax(parseMoneyInput(maxValorInput));
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [minValorInput, maxValorInput]);
 
   const dataForTable = useMemo(
     () =>
@@ -89,6 +105,10 @@ export function CreditorsTable({ data, companySlug }: Props) {
       {
         accessorKey: "classe",
         header: "Classe",
+        cell: ({ row }) => {
+          const classe = row.original.classe;
+          return classe === "I" ? "Trabalhista" : `Classe ${classe}`;
+        },
         filterFn: (row, columnId, filterValue) => {
           if (!filterValue) return true;
           return String(row.getValue(columnId)) === String(filterValue);
@@ -134,13 +154,6 @@ export function CreditorsTable({ data, companySlug }: Props) {
         header: "Status",
         cell: ({ row }) => (
           <StatusBadgeInline status={row.original.status} elegivel={row.original.elegivel} />
-        ),
-      },
-      {
-        accessorKey: "desagioRec",
-        header: "Deságio rec.",
-        cell: ({ row }) => (
-          <span className="text-xs text-muted-foreground">{row.original.desagioRec}</span>
         ),
       },
     ],
@@ -212,15 +225,23 @@ export function CreditorsTable({ data, companySlug }: Props) {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todas as classes</SelectItem>
-            <SelectItem value="I">Classe I</SelectItem>
+            <SelectItem value="I">Trabalhista</SelectItem>
             <SelectItem value="II">Classe II</SelectItem>
             <SelectItem value="III">Classe III</SelectItem>
             <SelectItem value="IV">Classe IV</SelectItem>
           </SelectContent>
         </Select>
         <div className="grid grid-cols-2 gap-2">
-          <Input placeholder="Mín R$" value={minValor} onChange={(event) => setMinValor(event.target.value)} />
-          <Input placeholder="Máx R$" value={maxValor} onChange={(event) => setMaxValor(event.target.value)} />
+          <Input
+            placeholder="Mín R$"
+            value={minValorInput}
+            onChange={(e) => setMinValorInput(e.target.value.replace(/[^\d.,]/g, ""))}
+          />
+          <Input
+            placeholder="Máx R$"
+            value={maxValorInput}
+            onChange={(e) => setMaxValorInput(e.target.value.replace(/[^\d.,]/g, ""))}
+          />
         </div>
       </div>
 
@@ -248,7 +269,7 @@ export function CreditorsTable({ data, companySlug }: Props) {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                   Nenhum credor encontrado para os filtros selecionados.
                 </TableCell>
               </TableRow>
@@ -277,12 +298,4 @@ export function CreditorsTable({ data, companySlug }: Props) {
       </div>
     </div>
   );
-}
-
-function parseMoneyInput(value: string): number | null {
-  const cleaned = value.trim();
-  if (!cleaned) return null;
-  const normalized = cleaned.replace(/\./g, "").replace(",", ".");
-  const parsed = Number.parseFloat(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
 }

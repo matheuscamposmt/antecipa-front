@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { z } from "zod";
-import { loadCompanies, loadCompanyDetail, loadCredorPhones, loadCredorRJDetail, loadOverview, type CompanyItem } from "./data.js";
+import { loadCompanies, loadCompanyDetail, loadCredorParentes, loadCredorPhones, loadCredorRJDetail, loadOverview, type CompanyItem } from "./data.js";
 import { hasRedshiftConfigured } from "./redshift.js";
 import { loadCredorPrecatorioDetail, loadPrecatorioDebtors, loadPrecatorioDetail, loadPrecatorioOverview, loadProcessoDetail } from "./precatorios-data.js";
 
@@ -12,15 +12,15 @@ function filterCompanies(
   companies: CompanyItem[],
   search: string,
   onlyWithCreditors: boolean,
+  creditMin?: number | null,
+  creditMax?: number | null,
 ): CompanyItem[] {
   const query = search.trim().toLowerCase();
   return companies.filter((item) => {
-    if (onlyWithCreditors && item.quantidadeCredores === 0) {
-      return false;
-    }
-    if (!query) {
-      return true;
-    }
+    if (onlyWithCreditors && item.quantidadeCredores === 0) return false;
+    if (creditMin != null && item.totalCredito < creditMin) return false;
+    if (creditMax != null && item.totalCredito > creditMax) return false;
+    if (!query) return true;
     return (
       item.nomeEmpresa.toLowerCase().includes(query) ||
       item.grupoEconomico.toLowerCase().includes(query) ||
@@ -49,10 +49,12 @@ server.get("/api/companies", async (request) => {
     pageSize: z.coerce.number().int().min(1).max(200).default(24),
     search: z.string().default(""),
     onlyWithCreditors: z.coerce.boolean().default(false),
+    creditMin: z.coerce.number().positive().optional(),
+    creditMax: z.coerce.number().positive().optional(),
   });
-  const { page, pageSize, search, onlyWithCreditors } = querySchema.parse(request.query);
+  const { page, pageSize, search, onlyWithCreditors, creditMin, creditMax } = querySchema.parse(request.query);
 
-  const filtered = filterCompanies(await loadCompanies(), search, onlyWithCreditors);
+  const filtered = filterCompanies(await loadCompanies(), search, onlyWithCreditors, creditMin, creditMax);
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -102,6 +104,16 @@ server.get("/api/credores/rj/:hash/phones", async (request, reply) => {
     return reply.code(404).send({ error: "Credor não encontrado" });
   }
   return { telefones };
+});
+
+server.get("/api/credores/rj/:hash/parentes", async (request, reply) => {
+  const paramsSchema = z.object({ hash: z.string().min(1) });
+  const { hash } = paramsSchema.parse(request.params);
+  const result = await loadCredorParentes(hash);
+  if (!result) {
+    return reply.code(404).send({ error: "Credor não encontrado" });
+  }
+  return result;
 });
 
 server.get("/api/credores/precatorio/:numeroProcesso/:credorNome", async (request, reply) => {

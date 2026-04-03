@@ -48,6 +48,13 @@ export type ProspectDetails = {
   };
 };
 
+export type ClasseBreakdownItem = {
+  classe: string;
+  quantidade: number;
+  valorTotal: number;
+  empresas: number;
+};
+
 export type Overview = {
   loadedAt: string;
   totalEmpresas: number;
@@ -59,6 +66,7 @@ export type Overview = {
   topAdministradoresJudiciais: Array<{ nome: string; empresas: number }>;
   topClasses: Array<{ classe: string; quantidade: number }>;
   topEmpresasPorCredito: Array<{ nome: string; totalCredito: number }>;
+  classeBreakdown: ClasseBreakdownItem[];
 };
 
 export type PrecatorioOverview = {

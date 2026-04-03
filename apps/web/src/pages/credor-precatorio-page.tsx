@@ -3,6 +3,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import {
   AlertCircle,
   BanknoteArrowDown,
+  ChevronDown,
   ExternalLink,
   FileText,
   Landmark,
@@ -17,13 +18,16 @@ import type { CredorPrecatorioDetail } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   InfoField,
-  OriginationScoreCard,
   PhonesSection,
   ProspectDetailsCard,
   ProspectStatusBadge,
+  ScoreBreakdown,
+  scoreLabelText,
+  scoreTextColor,
   parseDesagioRange,
 } from "@/components/creditor-detail-shared";
 
@@ -77,31 +81,78 @@ export function CredorPrecatorioPage() {
 
   return (
     <div className="space-y-6 p-4 lg:p-6">
-      <section className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1 space-y-2">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-            Credor · Precatório
-          </p>
-          <h1 className="text-2xl font-bold leading-tight text-emerald-950 lg:text-3xl">{detail.credorNome}</h1>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={detail.tipoPessoa === "PF" ? "default" : "secondary"} className={detail.tipoPessoa === "PF" ? "bg-emerald-700 text-white" : ""}>
-              <User className="mr-1 size-3" />
-              {detail.tipoPessoa === "PF"
-                ? "Pessoa Física"
-                : detail.tipoPessoa === "PJ"
-                  ? "Pessoa Jurídica"
-                  : "Não identificado"}
-            </Badge>
-            {detail.credorDocumento ? <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">{detail.credorDocumento}</Badge> : null}
-            {detail.precatorios[0]?.natureza ? <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700">{detail.precatorios[0].natureza}</Badge> : null}
-            <ProspectStatusBadge status={detail.status} elegivel={detail.elegivel} />
+      <section className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+          Credor · Precatório
+        </p>
+        <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold leading-tight text-emerald-950 lg:text-3xl">{detail.credorNome}</h1>
+            <div className="h-8 w-px shrink-0 bg-border" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-muted"
+                >
+                  <span className={`text-5xl font-bold tabular-nums leading-none ${scoreTextColor(detail.score)}`}>
+                    {detail.score}
+                  </span>
+                  <div className="text-left">
+                    <p className="text-[10px] leading-none text-muted-foreground">/100</p>
+                    <p className={`text-xs font-semibold ${scoreTextColor(detail.score)}`}>{scoreLabelText(detail.score)}</p>
+                  </div>
+                  <ChevronDown className="size-3.5 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72 p-3">
+                <p className="mb-3 text-xs font-medium text-muted-foreground">Composição do score</p>
+                <ScoreBreakdown dimensions={[
+                  {
+                    label: "Ativo",
+                    description: "Certeza jurídica e liquidez",
+                    value: detail.scoreAtivo,
+                    max: 40,
+                    items: detail.scoreBreakdown.ativo.items,
+                    note: detail.scoreBreakdown.ativo.note,
+                  },
+                  {
+                    label: "Devedor",
+                    description: "Capacidade de pagamento",
+                    value: detail.scoreDevedor,
+                    max: 35,
+                    items: detail.scoreBreakdown.devedor.items,
+                    note: detail.scoreBreakdown.devedor.note,
+                  },
+                  {
+                    label: "Credor",
+                    description: "Propensão à cessão",
+                    value: detail.scoreCredit,
+                    max: 25,
+                    items: detail.scoreBreakdown.credor.items,
+                    note: detail.scoreBreakdown.credor.note,
+                  },
+                ]} />
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <PhonesSection telefones={detail.telefones} loading={false} nome={detail.credorNome} />
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={detail.tipoPessoa === "PF" ? "default" : "secondary"} className={detail.tipoPessoa === "PF" ? "bg-emerald-700 text-white" : ""}>
+            <User className="mr-1 size-3" />
+            {detail.tipoPessoa === "PF"
+              ? "Pessoa Física"
+              : detail.tipoPessoa === "PJ"
+                ? "Pessoa Jurídica"
+                : "Não identificado"}
+          </Badge>
+          {detail.credorDocumento ? <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">{detail.credorDocumento}</Badge> : null}
+          {detail.precatorios[0]?.natureza ? <Badge variant="outline" className="border-teal-200 bg-teal-50 text-teal-700">{detail.precatorios[0].natureza}</Badge> : null}
+          <ProspectStatusBadge status={detail.status} elegivel={detail.elegivel} />
         </div>
+        <PhonesSection telefones={detail.telefones} loading={false} nome={detail.credorNome} />
       </section>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2 border-emerald-200/60 bg-gradient-to-br from-emerald-50/35 to-white">
+      <div className="grid grid-cols-1 gap-4">
+        <Card className="border-emerald-200/60 bg-gradient-to-br from-emerald-50/35 to-white">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <BanknoteArrowDown className="size-4 text-emerald-700" />
@@ -192,37 +243,6 @@ export function CredorPrecatorioPage() {
           </CardContent>
         </Card>
 
-        <OriginationScoreCard
-          score={detail.score}
-          desagioRec={detail.desagioRec}
-          tone="emerald"
-          dimensions={[
-            {
-              label: "Ativo",
-              description: "Certeza jurídica e liquidez",
-              value: detail.scoreAtivo,
-              max: 40,
-              items: detail.scoreBreakdown.ativo.items,
-              note: detail.scoreBreakdown.ativo.note,
-            },
-            {
-              label: "Devedor",
-              description: "Capacidade de pagamento",
-              value: detail.scoreDevedor,
-              max: 35,
-              items: detail.scoreBreakdown.devedor.items,
-              note: detail.scoreBreakdown.devedor.note,
-            },
-            {
-              label: "Credor",
-              description: "Propensão à cessão",
-              value: detail.scoreCredit,
-              max: 25,
-              items: detail.scoreBreakdown.credor.items,
-              note: detail.scoreBreakdown.credor.note,
-            },
-          ]}
-        />
       </div>
 
       <ProspectDetailsCard details={detail.prospectDetails} tone="emerald" />

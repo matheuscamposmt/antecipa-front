@@ -37,12 +37,16 @@ export async function fetchCompanies(params: {
   pageSize?: number;
   search?: string;
   onlyWithCreditors?: boolean;
+  creditMin?: number | null;
+  creditMax?: number | null;
 }): Promise<CompanyListResponse> {
   const query = new URLSearchParams();
   query.set("page", String(params.page ?? 1));
   query.set("pageSize", String(params.pageSize ?? 24));
   query.set("search", params.search ?? "");
   query.set("onlyWithCreditors", String(params.onlyWithCreditors ?? false));
+  if (params.creditMin != null) query.set("creditMin", String(params.creditMin));
+  if (params.creditMax != null) query.set("creditMax", String(params.creditMax));
   return getJson<CompanyListResponse>(`/api/companies?${query.toString()}`);
 }
 
@@ -65,6 +69,24 @@ export async function fetchCredorRJDetail(hash: string): Promise<CredorRJDetail>
 export async function fetchCredorRJPhones(hash: string): Promise<string[]> {
   const result = await getJson<{ telefones: string[] }>(`/api/credores/rj/${hash}/phones`);
   return result.telefones;
+}
+
+export type CredorParentesResponse = {
+  credorNome: string;
+  parentes: Array<{
+    nome: string;
+    cpfMasked: string;
+    municipio: string;
+    uf: string;
+    rendaAnualEstimada: number | null;
+    rendaAnoReferencia: number | null;
+    beneficiarioProgramaSocial: boolean;
+    programaSocialDescricao: string;
+  }>;
+};
+
+export async function fetchCredorParentes(hash: string): Promise<CredorParentesResponse> {
+  return getJson<CredorParentesResponse>(`/api/credores/rj/${hash}/parentes`);
 }
 
 export async function fetchCredorPrecatorioDetail(
