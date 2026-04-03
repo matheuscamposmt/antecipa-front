@@ -1,0 +1,147 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775067706717,
+  "projectRoot": "/home/matheusdemattos/Desktop/aetos/antecipa-front",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "pnpm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "pnpm build",
+    "testCommand": null,
+    "lintCommand": "pnpm lint",
+    "devCommand": "pnpm dev",
+    "scripts": {
+      "dev": "pnpm -r --parallel dev",
+      "dev:web": "pnpm --filter web dev",
+      "dev:api": "pnpm --filter api dev",
+      "build": "pnpm -r build",
+      "lint": "pnpm -r lint",
+      "typecheck": "pnpm -r typecheck"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "apps": {
+      "path": "apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775067706688,
+      "keyFiles": []
+    },
+    "data": {
+      "path": "data",
+      "purpose": "Data files",
+      "fileCount": 3,
+      "lastAccessed": 1775067706690,
+      "keyFiles": [
+        "aj_empresas_manual.sqlite",
+        "credores_extraidos.csv",
+        "db.sqlite"
+      ]
+    },
+    "apps/api": {
+      "path": "apps/api",
+      "purpose": "API routes",
+      "fileCount": 4,
+      "lastAccessed": 1775067706706,
+      "keyFiles": [
+        "eslint.config.js",
+        "package.json",
+        "tsconfig.json"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "apps/web/src/components/app-sidebar.tsx",
+      "accessCount": 6,
+      "lastAccessed": 1775078782923,
+      "type": "file"
+    },
+    {
+      "path": "apps/api/src/prospect-enrichment.ts",
+      "accessCount": 4,
+      "lastAccessed": 1775071874130,
+      "type": "file"
+    },
+    {
+      "path": "apps/api/src/data.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775076189792,
+      "type": "directory"
+    },
+    {
+      "path": "apps/api/src/redshift.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775076198460,
+      "type": "file"
+    },
+    {
+      "path": "data/credores_extraidos.csv",
+      "accessCount": 1,
+      "lastAccessed": 1775071496424,
+      "type": "file"
+    },
+    {
+      "path": "apps/api/src/views/credores_cnpj.sql",
+      "accessCount": 1,
+      "lastAccessed": 1775071855365,
+      "type": "file"
+    },
+    {
+      "path": "apps/web/package.json",
+      "accessCount": 1,
+      "lastAccessed": 1775076020075,
+      "type": "file"
+    },
+    {
+      "path": "apps/api/package.json",
+      "accessCount": 1,
+      "lastAccessed": 1775076020440,
+      "type": "file"
+    },
+    {
+      "path": "apps/api/src/server.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775076184473,
+      "type": "file"
+    },
+    {
+      "path": "apps/api/tsconfig.json",
+      "accessCount": 1,
+      "lastAccessed": 1775076198107,
+      "type": "file"
+    },
+    {
+      "path": "apps/web",
+      "accessCount": 1,
+      "lastAccessed": 1775078361735,
+      "type": "directory"
+    }
+  ],
+  "userDirectives": []
+}

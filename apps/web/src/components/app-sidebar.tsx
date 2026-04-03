@@ -50,8 +50,8 @@ export function AppSidebar() {
                   <Landmark className="size-4" />
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate font-bold">Aetos</span>
-                  <span className="truncate text-xs text-muted-foreground">Capital · FIDC-NP</span>
+                  <span className="truncate font-bold"></span>
+                  <span className="truncate text-xs text-muted-foreground">Antecipação de Crédito</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -113,7 +113,7 @@ export function AppSidebar() {
                 <SidebarMenuButton
                   size="lg"
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                  tooltip="Aetos Capital"
+                  tooltip=""
                 >
                   <Avatar className="size-8 rounded-lg shrink-0">
                     <AvatarFallback className="rounded-lg bg-primary/15 text-xs font-semibold text-primary">
@@ -121,7 +121,7 @@ export function AppSidebar() {
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">Aetos Capital</span>
+                    <span className="truncate font-semibold"></span>
                     <span className="truncate text-xs text-muted-foreground">v0.2 · mar 2026</span>
                   </div>
                   <ChevronsUpDown className="ml-auto size-4 shrink-0 text-muted-foreground" />
@@ -142,7 +142,7 @@ export function AppSidebar() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="grid leading-tight">
-                      <span className="truncate font-semibold">Aetos Capital</span>
+                      <span className="truncate font-semibold"></span>
                       <span className="truncate text-xs text-muted-foreground">originação judicial</span>
                     </div>
                   </div>
