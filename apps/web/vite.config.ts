@@ -10,6 +10,6 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    allowedHosts: ['.trycloudflare.com']
+    allowedHosts: ['.trycloudflare.com', 'web-production-bbe3.up.railway.app']
   }
 })
