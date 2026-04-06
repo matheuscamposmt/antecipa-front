@@ -6,3 +6,4 @@ build
 .env.*
 *.log
 apps/web/.vite
+/.omc/
