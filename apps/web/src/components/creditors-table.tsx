@@ -53,7 +53,7 @@ function parseMoneyInput(value: string): number | null {
 }
 
 export function CreditorsTable({ data, companySlug }: Props) {
-  const [sorting, setSorting] = useState<SortingState>([{ id: "score", desc: true }]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "valor", desc: true }]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [statusFilter, setStatusFilter] = useState("all");
