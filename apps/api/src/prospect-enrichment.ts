@@ -84,8 +84,8 @@ type CountRow = {
   total: string | number;
 };
 
-type CnpjBasicoRow = {
-  cnpj_basico: string | null;
+type CredorCnpjRow = {
+  cnpj_basico_empresa: string | null;
 };
 
 type PgfnRow = {
@@ -409,25 +409,22 @@ export async function loadCompanyPgfnContext(companyName: string): Promise<Compa
     return null;
   }
 
-  const matches = await queryRows<CnpjBasicoRow>(
+  const rows = await queryRows<CredorCnpjRow>(
     `
-      SELECT DISTINCT cnpj_basico
-      FROM receita_federal.pessoa_juridica
-      WHERE (
-        razao_social = $1
-        OR UPPER(TRIM(razao_social)) = UPPER(TRIM($2))
-      )
-        AND cnpj_basico IS NOT NULL
-      LIMIT 2
+      SELECT cnpj_basico_empresa
+      FROM administradores_judiciais.credores_cnpj
+      WHERE nome_da_empresa = $1
+        AND cnpj_basico_empresa IS NOT NULL
+      LIMIT 1
     `,
-    [companyName, companyName],
+    [companyName],
   );
 
-  if (matches.length !== 1 || !matches[0]?.cnpj_basico) {
+  if (!rows[0]?.cnpj_basico_empresa) {
     return null;
   }
 
-  const cnpjBasico = matches[0].cnpj_basico;
+  const cnpjBasico = rows[0].cnpj_basico_empresa;
   const pgfnRows = await queryRows<PgfnRow>(
     `
       SELECT

@@ -159,7 +159,13 @@ export function CompanyPage() {
           </Card>
         </div>
         <div className="xl:col-span-4">
-          <RankingList ranking={detail.ranking} companySlug={company.slug} />
+          <RankingList
+            ranking={[...detail.credores]
+              .filter((c) => c.valor >= 20_000)
+              .sort((a, b) => b.valor - a.valor || b.score - a.score)
+              .slice(0, 10)}
+            companySlug={company.slug}
+          />
         </div>
       </section>
     </div>

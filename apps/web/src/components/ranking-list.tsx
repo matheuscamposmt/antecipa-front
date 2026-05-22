@@ -23,7 +23,7 @@ export function RankingList({ ranking, companySlug }: Props) {
       <CardHeader>
         <CardTitle className="text-base">Ranking de credores qualificados</CardTitle>
         <p className="text-xs text-muted-foreground">
-          Classe I · valor até 15 salários mínimos · score ≥ 50
+          Créditos ≥ R$&nbsp;20.000 · ordenados por valor
         </p>
       </CardHeader>
 
@@ -92,26 +92,28 @@ export function RankingList({ ranking, companySlug }: Props) {
                 </div>
 
                 {/* Score */}
-                <div className="shrink-0 space-y-1">
-                  <div className="flex items-center justify-end gap-1.5">
-                    <ScoreChip score={creditor.score} />
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          aria-label="Decomposição do score"
-                        >
-                          <CircleHelp className="h-3.5 w-3.5" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="left" className={TOOLTIP_CLASS}>
-                        <ScoreExplanation creditor={creditor} />
-                      </TooltipContent>
-                    </Tooltip>
+                {creditor.score > 0 && (
+                  <div className="shrink-0 space-y-1">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <ScoreChip score={creditor.score} />
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            aria-label="Decomposição do score"
+                          >
+                            <CircleHelp className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className={TOOLTIP_CLASS}>
+                          <ScoreExplanation creditor={creditor} />
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <ScoreMiniBar value={creditor.score} />
                   </div>
-                  <ScoreMiniBar value={creditor.score} />
-                </div>
+                )}
               </div>
             </div>
           ))}
