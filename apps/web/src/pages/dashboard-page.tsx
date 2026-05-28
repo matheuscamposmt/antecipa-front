@@ -84,12 +84,12 @@ export function DashboardPage() {
   }, [creditMinInput, creditMaxInput]);
 
   return (
-    <div className="space-y-6 p-4 lg:p-6">
+    <div className="mx-auto max-w-[96rem] space-y-6 p-4 lg:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Recuperação Judicial</h1>
+          <h1 className="font-heading text-3xl font-normal tracking-tight">Recuperação Judicial</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Credores trabalhistas mapeados por score · Lei 11.101/2005
+            Credores trabalhistas mapeados por índice · Lei 11.101/2005
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

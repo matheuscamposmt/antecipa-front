@@ -121,6 +121,8 @@ export type Creditor = {
   moeda: string;
   extra: string;
   telefones: string[];
+  hasTelefone: boolean;
+  rendaMensalEstimada: number | null;
   score: number;
   scoreAtivo: number;
   scoreDevedor: number;

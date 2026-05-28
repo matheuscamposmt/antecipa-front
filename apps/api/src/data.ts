@@ -4,11 +4,11 @@ import {
   type DetailScoreDimension,
   hasValidDocument,
   inferDocType,
-  loadCompanyPgfnContext,
   loadProspectDetails,
   type ProspectDetails,
 } from "./prospect-enrichment.js";
-import { loadPhonesByContacts, normalizeNameForMatch, queryRows, toNumber } from "./redshift.js";
+import { loadPhonesByDocuments, normalizeNameForMatch, queryRows, toNumber } from "./redshift.js";
+import { ticketQualificationPoints } from "./scoring.js";
 
 type NullableString = string | null;
 
@@ -38,6 +38,16 @@ type RawCreditorRow = {
   extra: string | null;
 };
 
+type ScoredCreditorRow = RawCreditorRow & {
+  tipo_pessoa: string;
+  score: string | number;
+  score_ativo: string | number;
+  score_devedor: string | number;
+  score_credor: string | number;
+  has_telefone: boolean | null;
+  renda_mensal_aj: string | number | null;
+};
+
 export type ProspectStatus = "qualificado" | "marginal" | "rejeitado";
 
 export type CreditorItem = {
@@ -50,6 +60,8 @@ export type CreditorItem = {
   moeda: string;
   extra: string;
   telefones: string[];
+  hasTelefone: boolean;
+  rendaMensalEstimada: number | null;
   score: number;
   scoreAtivo: number;
   scoreDevedor: number;
@@ -150,10 +162,6 @@ export type OverviewData = {
   classeBreakdown: ClasseBreakdownItem[];
 };
 
-const SALARIO_MINIMO = Number.parseFloat(process.env.SALARIO_MINIMO ?? "1518");
-const MAX_SALARIOS_TRABALHISTA = 15;
-const MAX_CREDITO_TRABALHISTA = SALARIO_MINIMO * MAX_SALARIOS_TRABALHISTA;
-
 function cleanGrupoEconomicoSql(expression: string): string {
   return `
     CASE
@@ -197,21 +205,6 @@ function normalizeClasse(classe: string): string {
   }
   const tokenMatch = normalized.match(/\b(I|II|III|IV)\b/);
   return tokenMatch?.[1] ?? normalized;
-}
-
-function mean(values: number[]): number {
-  if (values.length === 0) {
-    return 0;
-  }
-  return values.reduce((acc, value) => acc + value, 0) / values.length;
-}
-
-function stdDev(values: number[], avg: number): number {
-  if (values.length <= 1) {
-    return 0;
-  }
-  const variance = values.reduce((acc, value) => acc + (value - avg) ** 2, 0) / values.length;
-  return Math.sqrt(variance);
 }
 
 function median(values: number[]): number {
@@ -265,41 +258,13 @@ function computeAtivoDimension(creditor: {
   };
 }
 
-function computeFaixaFallback(valor: number): number {
-  const idealValue = MAX_CREDITO_TRABALHISTA / 2;
-  const distanceFromIdeal = Math.abs(valor - idealValue) / idealValue;
-  return Math.round(Math.max(0, 5 * (1 - Math.min(distanceFromIdeal, 1))));
-}
-
-async function computeRJDevedorDimension(params: {
-  nomeEmpresa: string;
-  dataHomologacao: string;
-  valor: number;
-}): Promise<DetailScoreDimension> {
-  const homologacaoScore = params.dataHomologacao ? 18 : 4;
-  const pgfnContext = await Promise.race<Awaited<ReturnType<typeof loadCompanyPgfnContext>>>([
-    loadCompanyPgfnContext(params.nomeEmpresa),
-    new Promise((resolve) => setTimeout(() => resolve(null), 1_500)),
-  ]);
-  const pgfnScore =
-    !pgfnContext ? 8 :
-    pgfnContext.quantidadeInscricoes === 0 ? 12 :
-    pgfnContext.valorConsolidado <= 100_000 ? 8 :
-    pgfnContext.valorConsolidado <= 1_000_000 ? 5 :
-    2;
-  const faixaFallback = computeFaixaFallback(params.valor);
-
+function computeDevedorDimension(valor: number): DetailScoreDimension {
+  const pts = ticketQualificationPoints(valor, 35);
   return {
-    total: homologacaoScore + pgfnScore + faixaFallback,
-    method: pgfnContext ? "parcial_real_com_pgfn" : "parcial_real_sem_pgfn",
-    note: pgfnContext
-      ? "Homologação e PGFN inferida por razão social exata; coobrigados ainda pendentes."
-      : "Homologação real e complemento neutro; PGFN depende de match exato da razão social.",
-    items: [
-      { label: "Plano homologado", pts: homologacaoScore, max: 18 },
-      { label: "PGFN do devedor", pts: pgfnScore, max: 12 },
-      { label: "Faixa do crédito (fallback)", pts: faixaFallback, max: 5 },
-    ],
+    total: pts,
+    method: "proxy_ticket",
+    note: "Faixa de valor do crédito como proxy de risco.",
+    items: [{ label: "Faixa de valor do crédito", pts, max: 35 }],
   };
 }
 
@@ -310,10 +275,6 @@ async function scoreCredorRJDetail(creditor: {
   classe: string;
   valor: number;
   extra: string;
-  empresa: {
-    nomeEmpresa: string;
-    dataHomologacao: string;
-  };
 }): Promise<{
   score: number;
   scoreAtivo: number;
@@ -326,7 +287,7 @@ async function scoreCredorRJDetail(creditor: {
   prospectDetails: ProspectDetails;
 }> {
   const classeNorm = normalizeClasse(creditor.classe);
-  const elegivel = classeNorm === "I" && creditor.valor > 0 && creditor.valor <= MAX_CREDITO_TRABALHISTA;
+  const elegivel = classeNorm === "I" && creditor.valor > 0;
 
   if (!elegivel) {
     const prospectDetails = await loadProspectDetails({
@@ -347,7 +308,7 @@ async function scoreCredorRJDetail(creditor: {
         ativo: {
           total: 0,
           method: "fora_criterio",
-          note: "Somente créditos trabalhistas elegíveis entram no score de originação.",
+          note: "Somente créditos trabalhistas elegíveis entram no índice de originação.",
           items: [
             { label: "Classe Trabalhista", pts: 0, max: 20 },
             { label: "Documento válido", pts: 0, max: 12 },
@@ -358,11 +319,7 @@ async function scoreCredorRJDetail(creditor: {
           total: 0,
           method: "fora_criterio",
           note: "Prospect fora do recorte operacional atual.",
-          items: [
-            { label: "Plano homologado", pts: 0, max: 18 },
-            { label: "PGFN do devedor", pts: 0, max: 12 },
-            { label: "Faixa do crédito (fallback)", pts: 0, max: 5 },
-          ],
+          items: [{ label: "Faixa de valor do crédito", pts: 0, max: 35 }],
         },
         credor: {
           total: 0,
@@ -383,14 +340,8 @@ async function scoreCredorRJDetail(creditor: {
     documento: creditor.cpfCnpj,
     tipoPessoa: creditor.tipoPessoa,
   });
-  const [ativo, devedor] = await Promise.all([
-    Promise.resolve(computeAtivoDimension(creditor)),
-    computeRJDevedorDimension({
-      nomeEmpresa: creditor.empresa.nomeEmpresa,
-      dataHomologacao: creditor.empresa.dataHomologacao,
-      valor: creditor.valor,
-    }),
-  ]);
+  const ativo = computeAtivoDimension(creditor);
+  const devedor = computeDevedorDimension(creditor.valor);
   const credorDimension = buildCredorScoreDimension({
     tipoPessoa: creditor.tipoPessoa,
     valor: creditor.valor,
@@ -420,17 +371,9 @@ async function scoreCredorRJDetail(creditor: {
 }
 
 function scoreCreditors(creditors: Omit<CreditorItem, "score" | "scoreAtivo" | "scoreDevedor" | "scoreCredit" | "status" | "desagioRec" | "elegivel" | "scoreBreakdown">[]): CreditorItem[] {
-  const eligibleValues = creditors
-    .filter((c) => normalizeClasse(c.classe) === "I" && c.valor > 0 && c.valor <= MAX_CREDITO_TRABALHISTA)
-    .map((c) => c.valor);
-
-  const avg = mean(eligibleValues);
-  const deviation = stdDev(eligibleValues, avg);
-  const idealValue = MAX_CREDITO_TRABALHISTA / 2;
-
   return creditors.map((creditor) => {
     const classeNorm = normalizeClasse(creditor.classe);
-    const elegivel = classeNorm === "I" && creditor.valor > 0 && creditor.valor <= MAX_CREDITO_TRABALHISTA;
+    const elegivel = classeNorm === "I" && creditor.valor > 0;
     const hasValidDoc = hasValidCpfCnpj(creditor.cpfCnpj);
     const extraNorm = normalizeNameForMatch(creditor.extra || "");
     const hasRisco = /(IMPUGN|DIVERGEN|CONTEST|RESERVA|SUB JUDICE|RETIFIC)/.test(extraNorm);
@@ -453,28 +396,20 @@ function scoreCreditors(creditors: Omit<CreditorItem, "score" | "scoreAtivo" | "
       };
     }
 
-    // Value z-score (relative to eligible pool)
-    const z = deviation > 0 ? Math.abs((creditor.valor - avg) / deviation) : 0;
-    const rawValorScore = Math.max(0, 45 * (1 - Math.min(z, 3) / 3));
-
-    // Faixa: distance from ideal value
-    const distanceFromIdeal = Math.abs(creditor.valor - idealValue) / idealValue;
-    const faixaScore = Math.max(0, 15 * (1 - Math.min(distanceFromIdeal, 1)));
-
     // Score do Ativo (0–40): certeza jurídica e liquidez
     const classeScore = 20; // Classe I qualifies
     const documentoScore = hasValidDoc ? 12 : 0;
     const sinaisScore = hasRisco ? 0 : 8;
     const scoreAtivo = classeScore + documentoScore + sinaisScore;
 
-    // Score do Devedor (0–35): proxy from faixa distribution
+    // Score do Devedor (0–35): faixa de ticket comercial, não menor-valor-primeiro
     // TODO: replace with real company health metrics (RCL, homologação, coobrigados)
-    const scoreDevedor = Math.round((faixaScore / 15) * 35);
+    const scoreDevedor = ticketQualificationPoints(creditor.valor, 35);
 
     // Score do Credor (0–25): propensão a ceder
     // TODO: enrich with telecom.contatos (renda, localização, benefícios sociais)
     const tipoPessoaScore = creditor.tipoPessoa === "PF" ? 10 : creditor.tipoPessoa === "PJ" ? 6 : 2;
-    const valorPartial = Math.round((rawValorScore / 45) * 15);
+    const valorPartial = ticketQualificationPoints(creditor.valor, 15);
     const scoreCredit = tipoPessoaScore + valorPartial;
 
     const score = Math.min(100, Math.max(0, scoreAtivo + scoreDevedor + scoreCredit));
@@ -528,6 +463,28 @@ async function loadCompanySummaries(): Promise<CompanyItem[]> {
           COUNT(c.row_hash) AS quantidade_credores,
           SUM(CASE WHEN REGEXP_REPLACE(COALESCE(c.cpf_cnpj, ''), '\\\\D', '') ~ '^\\\\d{11}$' THEN 1 ELSE 0 END) AS quantidade_pf,
           SUM(CASE WHEN REGEXP_REPLACE(COALESCE(c.cpf_cnpj, ''), '\\\\D', '') ~ '^\\\\d{14}$' THEN 1 ELSE 0 END) AS quantidade_pj,
+          SUM(
+            CASE
+              WHEN COALESCE(d.data_do_documento, d.data_homologacao, d.processed_at::date) >= DATE '2025-06-01'
+               AND REGEXP_REPLACE(COALESCE(c.cpf_cnpj, ''), '\\\\D', '') ~ '^\\\\d{11}$'
+               AND (
+                 UPPER(TRIM(COALESCE(c.classe, ''))) IN ('I', 'CLASSE I')
+                 OR UPPER(TRIM(COALESCE(c.classe, ''))) LIKE '%TRABALH%'
+                 OR UPPER(TRIM(COALESCE(c.classe, ''))) LIKE 'CLASSE I %'
+                 OR UPPER(TRIM(COALESCE(c.classe, ''))) LIKE 'CLASSE I-%'
+                 OR UPPER(TRIM(COALESCE(c.classe, ''))) LIKE 'CLASSE I/%'
+               )
+              THEN 1
+              ELSE 0
+            END
+          ) AS prioridade_credores_trabalhistas_cpf,
+          MAX(
+            CASE
+              WHEN COALESCE(d.data_do_documento, d.data_homologacao, d.processed_at::date) >= DATE '2025-06-01'
+              THEN 1
+              ELSE 0
+            END
+          ) AS prioridade_relacao_recente,
           MAX(d.processed_at)::text AS loaded_at
         FROM docs d
         LEFT JOIN administradores_judiciais.credores c
@@ -569,7 +526,12 @@ async function loadCompanySummaries(): Promise<CompanyItem[]> {
         ON meta.nome_da_empresa = agg.nome_da_empresa
        AND meta.grupo_economico = agg.grupo_economico
        AND meta.rn = 1
-      ORDER BY agg.total_credito DESC, agg.nome_da_empresa ASC
+      ORDER BY
+        agg.prioridade_relacao_recente DESC,
+        agg.prioridade_credores_trabalhistas_cpf DESC,
+        meta.data_referencia_iso DESC,
+        agg.total_credito DESC,
+        agg.nome_da_empresa ASC
     `,
   );
 
@@ -610,35 +572,93 @@ async function loadTopClasses(): Promise<Array<{ classe: string; quantidade: num
   }));
 }
 
-async function loadCompanyCreditors(company: CompanyItem): Promise<Omit<CreditorItem, "score" | "scoreAtivo" | "scoreDevedor" | "scoreCredit" | "status" | "desagioRec" | "elegivel" | "scoreBreakdown">[]> {
-  const rows = await queryRows<RawCreditorRow>(
-    `
-      SELECT
-        row_hash,
-        nome,
-        cpf_cnpj,
-        classe,
-        valor::text AS valor,
-        moeda,
-        extra
-      FROM administradores_judiciais.credores
-      WHERE nome_da_empresa = $1
-      ORDER BY valor DESC, nome ASC
-    `,
-    [company.nomeEmpresa],
-  );
-
-  return rows.map((row) => ({
+function mapScoredRow(row: ScoredCreditorRow): CreditorItem {
+  const classeNorm = normalizeClasse(row.classe ?? "");
+  const valor = toNumber(row.valor);
+  const elegivel = classeNorm === "I" && valor > 0;
+  const rawScore = elegivel ? Math.min(100, Math.max(0, toNumber(row.score))) : 0;
+  const scoreAtivo = elegivel ? toNumber(row.score_ativo) : 0;
+  const scoreDevedor = elegivel ? toNumber(row.score_devedor) : 0;
+  const scoreCredit = elegivel ? toNumber(row.score_credor) : 0;
+  return {
     rowHash: row.row_hash,
     nome: row.nome || "Credor não identificado",
     cpfCnpj: row.cpf_cnpj ?? "",
-    tipoPessoa: parseDocType(row.cpf_cnpj ?? ""),
+    tipoPessoa: row.tipo_pessoa === "PF" || row.tipo_pessoa === "PJ" ? row.tipo_pessoa : "OUTRO",
     classe: row.classe ?? "N/A",
-    valor: toNumber(row.valor),
+    valor,
     moeda: row.moeda ?? "BRL",
     extra: row.extra ?? "",
     telefones: [],
-  }));
+    hasTelefone: row.has_telefone === true,
+    rendaMensalEstimada: row.renda_mensal_aj != null ? toNumber(row.renda_mensal_aj) : null,
+    score: rawScore,
+    scoreAtivo,
+    scoreDevedor,
+    scoreCredit,
+    status: elegivel ? statusFromScore(rawScore) : "rejeitado",
+    desagioRec: elegivel ? desagioFromScore(rawScore) : "Não recomendado",
+    elegivel,
+    scoreBreakdown: {
+      ativo: { classe: 0, documento: 0, sinais: 0, total: scoreAtivo },
+      devedor: { faixa: scoreDevedor, total: scoreDevedor },
+      credor: { tipoPessoa: 0, valor: 0, total: scoreCredit },
+    },
+  };
+}
+
+async function loadCompanyCreditors(company: CompanyItem): Promise<CreditorItem[]> {
+  try {
+    const rows = await queryRows<ScoredCreditorRow>(
+      `
+        SELECT
+          row_hash,
+          nome,
+          cpf_cnpj,
+          tipo_pessoa,
+          classe,
+          valor::text AS valor,
+          moeda,
+          extra,
+          has_telefone,
+          renda_mensal_aj,
+          score,
+          score_ativo,
+          score_devedor,
+          score_credor
+        FROM administradores_judiciais.credores_scored
+        WHERE nome_da_empresa = $1
+        ORDER BY score DESC, valor DESC, nome ASC
+      `,
+      [company.nomeEmpresa],
+    );
+    return rows.map(mapScoredRow);
+  } catch {
+    // view not yet materialized — fall back to proxy scoring
+    const rows = await queryRows<RawCreditorRow>(
+      `
+        SELECT row_hash, nome, cpf_cnpj, classe, valor::text AS valor, moeda, extra
+        FROM administradores_judiciais.credores
+        WHERE nome_da_empresa = $1
+        ORDER BY valor DESC, nome ASC
+      `,
+      [company.nomeEmpresa],
+    );
+    const unscored = rows.map((row) => ({
+      rowHash: row.row_hash,
+      nome: row.nome || "Credor não identificado",
+      cpfCnpj: row.cpf_cnpj ?? "",
+      tipoPessoa: parseDocType(row.cpf_cnpj ?? ""),
+      classe: row.classe ?? "N/A",
+      valor: toNumber(row.valor),
+      moeda: row.moeda ?? "BRL",
+      extra: row.extra ?? "",
+      telefones: [],
+      hasTelefone: false,
+      rendaMensalEstimada: null,
+    }));
+    return scoreCreditors(unscored);
+  }
 }
 
 async function loadClasseBreakdown(): Promise<ClasseBreakdownItem[]> {
@@ -717,8 +737,7 @@ export async function loadOverview(): Promise<OverviewData> {
 }
 
 export async function loadCompanies(): Promise<CompanyItem[]> {
-  const companies = await loadCompanySummaries();
-  return companies.sort((a, b) => b.totalCredito - a.totalCredito || a.nomeEmpresa.localeCompare(b.nomeEmpresa));
+  return loadCompanySummaries();
 }
 
 export async function loadCompanyDetail(slug: string): Promise<CompanyDetail | null> {
@@ -728,7 +747,7 @@ export async function loadCompanyDetail(slug: string): Promise<CompanyDetail | n
     return null;
   }
 
-  const scoredCreditors = scoreCreditors(await loadCompanyCreditors(company));
+  const scoredCreditors = await loadCompanyCreditors(company);
   const values = scoredCreditors.map((item) => item.valor);
   const ranking = [...scoredCreditors]
     .filter((creditor) => creditor.score > 0)
@@ -864,10 +883,6 @@ export async function loadCredorRJDetail(hash: string): Promise<CredorRJDetail |
     moeda: row.moeda ?? "BRL",
     extra: row.extra ?? "",
     telefones: [],
-    empresa: {
-      nomeEmpresa: empresa.nomeEmpresa,
-      dataHomologacao: empresa.dataHomologacao,
-    },
   };
   const scored = await scoreCredorRJDetail(baseCreditor);
 
@@ -908,10 +923,13 @@ export async function loadCredorPhones(hash: string): Promise<string[]> {
     [hash],
   );
   if (rows.length === 0) return [];
-  const nome = rows[0]!.nome;
   const cpfCnpj = rows[0]!.cpf_cnpj ?? "";
-  const phoneMap = await loadPhonesByContacts([{ name: nome, document: cpfCnpj }]).catch(() => new Map<string, string[]>());
-  return phoneMap.get(normalizeNameForMatch(nome)) ?? [];
+  const documentKey = cpfCnpj.replace(/\D/g, "");
+  if (documentKey.length !== 11 && documentKey.length !== 14) {
+    return [];
+  }
+  const phoneMap = await loadPhonesByDocuments([documentKey]).catch(() => new Map<string, string[]>());
+  return phoneMap.get(documentKey) ?? [];
 }
 
 export type ParenteItem = {

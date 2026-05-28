@@ -11,7 +11,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { ArrowUpDown } from "lucide-react";
-import { brl } from "@/lib/format";
+import { brl, formatDate } from "@/lib/format";
 import type { DevedorDetail } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -98,16 +98,19 @@ export function PrecatoriosTable({ detail, devedorSlug }: Props) {
             <ArrowUpDown className="ml-1 size-3" />
           </Button>
         ),
+        cell: ({ row }) => formatDate(row.original.vencimento),
         size: 130,
       },
       {
         accessorKey: "dataRecebimento",
         header: "Recebimento",
+        cell: ({ row }) => formatDate(row.original.dataRecebimento),
         size: 120,
       },
       {
         accessorKey: "dataUltimaAtualizacao",
         header: "Atualização",
+        cell: ({ row }) => formatDate(row.original.dataUltimaAtualizacao),
         size: 110,
       },
       {

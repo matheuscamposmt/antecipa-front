@@ -11,12 +11,13 @@ import {
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown } from "lucide-react";
+import { ArrowUpDown, Banknote, CheckCircle2, CircleDollarSign, Hash, Phone, ShieldCheck, Tag, TrendingUp, User } from "lucide-react";
 import type { Creditor } from "@/types";
-import { brl } from "@/lib/format";
+import { brl, documentId } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -36,12 +37,54 @@ function StatusBadgeInline({ status, elegivel }: { status: Creditor["status"]; e
     return <span className="inline-flex items-center rounded-md border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">Não elegível</span>;
   }
   if (status === "qualificado") {
-    return <span className="inline-flex items-center rounded-md border border-green-200 bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-800">Qualificado</span>;
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md border border-primary/25 px-1.5 py-0.5 text-[11px] font-medium text-primary">
+        <CheckCircle2 className="size-3" />
+        Qualificado
+      </span>
+    );
   }
   if (status === "marginal") {
     return <span className="inline-flex items-center rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 text-[11px] font-medium text-warning">Marginal</span>;
   }
   return <span className="inline-flex items-center rounded-md border border-border bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">Rejeitado</span>;
+}
+
+function ScoreDonut({ score }: { score: number }) {
+  const safe = Math.max(0, Math.min(100, score || 0));
+  const radius = 13;
+  const circumference = 2 * Math.PI * radius;
+  const color = score >= 65 ? "text-primary" : score >= 50 ? "text-warning" : "text-muted-foreground";
+
+  return (
+    <div className={`relative size-9 ${color}`} aria-label={`Score ${score || 0} de 100`}>
+      <svg className="size-9 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+        <circle
+          cx="18"
+          cy="18"
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeOpacity="0.12"
+          strokeWidth="3"
+        />
+        <circle
+          cx="18"
+          cy="18"
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="3"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - safe / 100)}
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold leading-none tabular-nums text-foreground">
+        {score || "—"}
+      </span>
+    </div>
+  );
 }
 
 function parseMoneyInput(value: string): number | null {
@@ -53,7 +96,10 @@ function parseMoneyInput(value: string): number | null {
 }
 
 export function CreditorsTable({ data, companySlug }: Props) {
-  const [sorting, setSorting] = useState<SortingState>([{ id: "valor", desc: true }]);
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "score", desc: true },
+    { id: "valor", desc: true },
+  ]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -87,24 +133,96 @@ export function CreditorsTable({ data, companySlug }: Props) {
     () => [
       {
         accessorKey: "nome",
-        header: "Credor",
+        header: () => <span className="inline-flex items-center gap-1"><User className="size-3.5" />Credor</span>,
         cell: ({ row }) => (
           <Link
             to={`/credor/rj/${row.original.rowHash}`}
             state={companySlug ? { backTo: `/empresa/${companySlug}`, backLabel: "Voltar para a empresa" } : undefined}
-            className="font-medium text-primary hover:underline"
+            className="font-semibold text-primary hover:underline"
           >
             {row.original.nome}
           </Link>
         ),
       },
       {
+        id: "hasTelefone",
+        accessorFn: (row) => (row.hasTelefone ? 1 : 0),
+        header: ({ column }) => (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                className="-ml-3 h-8 px-3"
+                onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              >
+                <Phone className="size-3.5" />
+                Tel.
+                <ArrowUpDown className="ml-1 size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Telefone cadastrado</TooltipContent>
+          </Tooltip>
+        ),
+        cell: ({ row }) => (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex justify-center">
+                <Phone className={`size-3.5 ${row.original.hasTelefone ? "text-primary" : "text-muted-foreground/30"}`} />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {row.original.hasTelefone ? "Tem telefone cadastrado" : "Sem telefone cadastrado"}
+            </TooltipContent>
+          </Tooltip>
+        ),
+        size: 40,
+      },
+      {
+        id: "rendaMensalEstimada",
+        accessorFn: (row) => row.rendaMensalEstimada ?? -1,
+        header: ({ column }) => (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                className="-ml-3 h-8 px-3"
+                onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+              >
+                <Banknote className="size-3.5" />
+                Renda/mês
+                <ArrowUpDown className="ml-1 size-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Renda mensal estimada</TooltipContent>
+          </Tooltip>
+        ),
+        cell: ({ row }) => {
+          const renda = row.original.rendaMensalEstimada;
+          return renda != null ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-xs tabular-nums text-muted-foreground">~{brl(renda)}</span>
+              </TooltipTrigger>
+              <TooltipContent>Renda mensal estimada</TooltipContent>
+            </Tooltip>
+          ) : (
+            <span className="text-xs text-muted-foreground/30">—</span>
+          );
+        },
+        size: 100,
+      },
+      {
         accessorKey: "cpfCnpj",
-        header: "CPF/CNPJ",
+        header: () => <span className="inline-flex items-center gap-1"><Hash className="size-3.5" />CPF/CNPJ</span>,
+        cell: ({ row }) => (
+          <span className="font-mono text-xs tabular-nums text-muted-foreground">
+            {documentId(row.original.cpfCnpj)}
+          </span>
+        ),
       },
       {
         accessorKey: "classe",
-        header: "Classe",
+        header: () => <span className="inline-flex items-center gap-1"><Tag className="size-3.5" />Classe</span>,
         cell: ({ row }) => {
           const classe = row.original.classe;
           return classe === "I" ? "Trabalhista" : `Classe ${classe}`;
@@ -122,8 +240,9 @@ export function CreditorsTable({ data, companySlug }: Props) {
             className="-ml-3 h-8 px-3"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
+            <CircleDollarSign className="size-3.5" />
             Valor
-            <ArrowUpDown className="ml-2 size-3" />
+            <ArrowUpDown className="ml-1 size-3" />
           </Button>
         ),
         cell: ({ row }) => brl(row.original.valor),
@@ -136,28 +255,24 @@ export function CreditorsTable({ data, companySlug }: Props) {
             className="-ml-3 h-8 px-3"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
+            <TrendingUp className="size-3.5" />
             Score
-            <ArrowUpDown className="ml-2 size-3" />
+            <ArrowUpDown className="ml-1 size-3" />
           </Button>
         ),
         cell: ({ row }) => {
-          const score = row.original.score;
-          const color =
-            score >= 65 ? "text-primary font-semibold" :
-            score >= 50 ? "text-warning font-semibold" :
-            "text-muted-foreground";
-          return <span className={color}>{score || "—"}</span>;
+          return <ScoreDonut score={row.original.score} />;
         },
       },
       {
         accessorKey: "status",
-        header: "Status",
+        header: () => <span className="inline-flex items-center gap-1"><ShieldCheck className="size-3.5" />Status</span>,
         cell: ({ row }) => (
           <StatusBadgeInline status={row.original.status} elegivel={row.original.elegivel} />
         ),
       },
     ],
-    [],
+    [companySlug],
   );
 
   const table = useReactTable({
@@ -251,7 +366,10 @@ export function CreditorsTable({ data, companySlug }: Props) {
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead
+                    key={header.id}
+                    className={header.column.id === "nome" ? "pl-5" : header.column.id === "status" ? "pr-5" : undefined}
+                  >
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
@@ -263,13 +381,18 @@ export function CreditorsTable({ data, companySlug }: Props) {
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                    <TableCell
+                      key={cell.id}
+                      className={cell.column.id === "nome" ? "pl-5" : cell.column.id === "status" ? "pr-5" : undefined}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={table.getAllLeafColumns().length} className="h-24 text-center text-muted-foreground">
                   Nenhum credor encontrado para os filtros selecionados.
                 </TableCell>
               </TableRow>

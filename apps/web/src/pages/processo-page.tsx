@@ -11,7 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { fetchProcessoDetail } from "@/lib/api";
-import { brl, integer, percent } from "@/lib/format";
+import { brl, formatDate, integer, percent } from "@/lib/format";
 import type { ProcessoDetail } from "@/types";
 import { MetricCard } from "@/components/metric-card";
 import { PhoneList } from "@/components/phone-list";
@@ -169,8 +169,8 @@ export function ProcessoPage() {
                           <span className="text-xs text-muted-foreground">Não</span>
                         )}
                       </TableCell>
-                      <TableCell>{row.vencimento || "-"}</TableCell>
-                      <TableCell>{row.dataRecebimento || "-"}</TableCell>
+                      <TableCell>{formatDate(row.vencimento)}</TableCell>
+                      <TableCell>{formatDate(row.dataRecebimento)}</TableCell>
                       <TableCell className="text-right">{brl(row.valorPrecatorio)}</TableCell>
                       <TableCell className="text-right">{brl(row.valorPagamento)}</TableCell>
                     </TableRow>

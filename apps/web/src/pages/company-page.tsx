@@ -3,12 +3,10 @@ import { useParams } from "react-router-dom";
 import { AlertCircle, Building2, ExternalLink, FileText, Scale, Users, Wallet } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { fetchCompanyDetail } from "@/lib/api";
-import { brl, integer } from "@/lib/format";
+import { brl, formatDate, integer } from "@/lib/format";
 import type { CompanyDetail } from "@/types";
 import { MetricCard } from "@/components/metric-card";
 import { CreditorsTable } from "@/components/creditors-table";
-import { RankingList } from "@/components/ranking-list";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -46,35 +44,48 @@ export function CompanyPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 p-4 lg:p-6">
-        <div className="rounded-xl border p-5 space-y-4">
+      <div className="mx-auto w-full max-w-[90rem] space-y-6 p-4 lg:p-6">
+        <section className="space-y-3 pb-2">
           <Skeleton className="h-3 w-40" />
-          <Skeleton className="h-8 w-96" />
-          <div className="flex gap-2">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-6 w-40" />
-            <Skeleton className="h-6 w-20" />
-          </div>
-        </div>
+          <Skeleton className="h-11 w-full max-w-6xl" />
+          <Skeleton className="h-8 w-24" />
+        </section>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="rounded-xl border p-4 space-y-2">
+            <div key={i} className="rounded-xl border p-5 space-y-3">
               <Skeleton className="h-3 w-24" />
-              <Skeleton className="h-6 w-32" />
+              <Skeleton className="h-8 w-36" />
+              <Skeleton className="h-3 w-28" />
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-8 rounded-xl border p-4 space-y-3">
-            <Skeleton className="h-4 w-48" />
-            <Skeleton className="h-3 w-64" />
-            <div className="space-y-2">
-              {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
-            </div>
+        <div className="w-full rounded-xl border bg-card p-6 space-y-4">
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-56" />
+            <Skeleton className="h-3 w-full max-w-2xl" />
           </div>
-          <div className="xl:col-span-4 rounded-xl border p-4 space-y-3">
-            <Skeleton className="h-4 w-40" />
-            {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
+            <Skeleton className="h-10 w-full md:col-span-2" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+          <div className="w-full overflow-auto rounded-lg border">
+            <div className="grid min-w-[1160px] grid-cols-[minmax(320px,1.6fr)_minmax(170px,0.8fr)_minmax(130px,0.65fr)_minmax(170px,0.85fr)_minmax(110px,0.5fr)_minmax(150px,0.7fr)] gap-4 border-b bg-muted/30 p-3">
+              {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-3 w-full" />)}
+            </div>
+            <div className="min-w-[1160px] divide-y">
+              {[0, 1, 2, 3, 4, 5, 6, 7].map((row) => (
+                <div key={row} className="grid grid-cols-[minmax(320px,1.6fr)_minmax(170px,0.8fr)_minmax(130px,0.65fr)_minmax(170px,0.85fr)_minmax(110px,0.5fr)_minmax(150px,0.7fr)] gap-4 p-3">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-4 w-28" />
+                  <Skeleton className="size-9 rounded-full" />
+                  <Skeleton className="h-5 w-24" />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -94,30 +105,19 @@ export function CompanyPage() {
   }
 
   const { company } = detail;
-  const qualificados = detail.credores.filter((c) => c.status === "qualificado").length;
-  const marginais = detail.credores.filter((c) => c.status === "marginal").length;
 
   return (
-    <div className="space-y-6 p-4 lg:p-6">
-      <section className="pb-2">
+    <div className="mx-auto w-full max-w-[90rem] space-y-6 p-4 lg:p-6">
+      <section className="space-y-3 pb-2">
         <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
           Recuperação Judicial
         </p>
-        <h1 className="mt-1 text-xl font-semibold leading-tight">{company.nomeEmpresa}</h1>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {company.administradorJudicial && (
-            <Badge variant="outline">AJ: {company.administradorJudicial}</Badge>
-          )}
-          {qualificados > 0 && (
-            <Badge className="bg-primary text-primary-foreground hover:bg-primary/90">
-              {qualificados} qualificado{qualificados !== 1 ? "s" : ""}
-            </Badge>
-          )}
-          {marginais > 0 && (
-            <Badge className="bg-warning text-warning-foreground hover:bg-warning/90">
-              {marginais} marginal{marginais !== 1 ? "is" : ""}
-            </Badge>
-          )}
+        <div className="space-y-2">
+          <h1 className="font-body max-w-5xl text-3xl font-bold leading-tight tracking-tight text-foreground lg:text-4xl">
+            {company.nomeEmpresa}
+          </h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           {company.linkCredores ? (
             <a
               href={company.linkCredores}
@@ -141,32 +141,21 @@ export function CompanyPage() {
           label="PF / PJ"
           value={`${integer(company.quantidadePF)} / ${integer(company.quantidadePJ)}`}
         />
-        <MetricCard icon={Building2} label="Relação de credores" value={company.dataDocumento || "—"} />
+        <MetricCard icon={Building2} label="Relação de credores" value={formatDate(company.dataDocumento)} />
       </section>
 
-      <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className="xl:col-span-8">
-          <Card className="border-primary/10">
-            <CardHeader>
-              <CardTitle className="text-base">Credores mapeados</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Elegíveis: Classe I (trabalhistas) com valor de até 15 salários mínimos.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <CreditorsTable data={detail.credores} companySlug={company.slug} />
-            </CardContent>
-          </Card>
-        </div>
-        <div className="xl:col-span-4">
-          <RankingList
-            ranking={[...detail.credores]
-              .filter((c) => c.valor >= 20_000)
-              .sort((a, b) => b.valor - a.valor || b.score - a.score)
-              .slice(0, 10)}
-            companySlug={company.slug}
-          />
-        </div>
+      <section>
+        <Card className="border-primary/10">
+          <CardHeader>
+            <CardTitle className="text-lg">Credores mapeados</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Tabela completa com filtros por status, classe, valor e índice de qualificação.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <CreditorsTable data={detail.credores} companySlug={company.slug} />
+          </CardContent>
+        </Card>
       </section>
     </div>
   );

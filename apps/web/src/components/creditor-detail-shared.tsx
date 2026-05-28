@@ -1,17 +1,33 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   ArrowUpRight,
+  BadgeAlert,
+  Banknote,
+  CheckCircle2,
+  Clock3,
+  HandHeart,
+  Home,
   MapPin,
+  MessageCircle,
   Phone,
   Send,
   ShieldCheck,
 } from "lucide-react";
-import { brl } from "@/lib/format";
+import { ajustarInflacao, brl } from "@/lib/format";
 import type { ProspectDetails, ProspectStatus } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
   SheetContent,
@@ -120,49 +136,105 @@ export function PhonesSection({
         </Sheet>
       )}
 
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Send className="size-3.5" />
-            Iniciar abordagem
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="right" className="w-96">
-          <SheetHeader>
-            <SheetTitle>Abordagem ativa</SheetTitle>
-            <p className="text-xs text-muted-foreground">
-              {telefones.length} número{telefones.length !== 1 ? "s" : ""} encontrado{telefones.length !== 1 ? "s" : ""} para {nome}
-            </p>
-          </SheetHeader>
-          <div className="mt-5 space-y-4">
-            <p className="text-xs text-muted-foreground">
-              Clique em um número para abrir o WhatsApp e iniciar a prospecção individualmente.
-            </p>
-            <div className="space-y-2">
-              {telefones.map((tel, i) => (
-                <div key={tel} className="flex items-center justify-between rounded-lg border p-3">
-                  <div className="flex items-center gap-2">
-                    <span className="flex size-5 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
-                      {i + 1}
-                    </span>
-                    <span className="font-mono text-sm">{formatPhone(tel)}</span>
-                  </div>
-                  <a
-                    href={whatsappUrl(tel)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10"
-                  >
-                    WhatsApp
-                    <ArrowUpRight className="size-3" />
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+      <ApproachDialog telefones={telefones} nome={nome} />
     </div>
+  );
+}
+
+function ApproachDialog({ telefones, nome }: { telefones: string[]; nome: string }) {
+  const [open, setOpen] = useState(false);
+  const [sentCount, setSentCount] = useState(0);
+  const total = telefones.length;
+  const progress = total > 0 ? Math.round((sentCount / total) * 100) : 0;
+  const complete = sentCount >= total;
+
+  useEffect(() => {
+    if (!open) {
+      setSentCount(0);
+      return;
+    }
+
+    setSentCount(0);
+    const timers = telefones.map((_, index) =>
+      window.setTimeout(() => setSentCount(index + 1), 450 + index * 520),
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [open, telefones]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5 bg-transparent shadow-none">
+          <Send className="size-3.5" />
+          Iniciar abordagem
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl overflow-hidden p-0">
+        <div className="relative border-b bg-primary/[0.04] p-6">
+          <div className="pointer-events-none absolute -right-16 -top-20 size-44 rounded-full bg-primary/10 blur-3xl" />
+          <DialogHeader className="relative pr-8">
+            <div className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-primary">
+              <Send className="size-3.5" />
+              Disparo de mensagens
+            </div>
+            <DialogTitle>Abordagem iniciada</DialogTitle>
+            <DialogDescription>
+              Enviando mensagem inicial para {total} número{total !== 1 ? "s" : ""} de {nome}.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className="space-y-5 p-6 pt-5">
+          <div className="rounded-xl border bg-background/70 p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <MessageCircle className="size-4" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold">{complete ? "Mensagens enviadas" : "Envio em andamento"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {sentCount} de {total} mensagem{total !== 1 ? "s" : ""} concluída{total !== 1 ? "s" : ""}
+                  </p>
+                </div>
+              </div>
+              <span className="font-mono text-sm font-semibold tabular-nums text-primary">{progress}%</span>
+            </div>
+            <Progress value={progress} className="h-1.5" />
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {telefones.map((tel, index) => {
+              const sent = index < sentCount;
+              return (
+                <div
+                  key={tel}
+                  className={`animate-enter rounded-xl border bg-card p-3 transition-colors ${sent ? "border-primary/20" : "border-border/80"}`}
+                  style={{ animationDelay: `${index * 90}ms` }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className={`flex size-9 shrink-0 items-center justify-center rounded-full ${sent ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        {sent ? <CheckCircle2 className="size-4" /> : <Clock3 className="size-4 animate-pulse" />}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-mono text-sm font-semibold tabular-nums">{formatPhone(tel)}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {sent ? "Mensagem inicial enviada" : "Na fila de envio"}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${sent ? "border-primary/20 text-primary" : "border-border text-muted-foreground"}`}>
+                      {sent ? "Enviado" : "Fila"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -231,7 +303,14 @@ export function ProspectStatusBadge({
   status: ProspectStatus;
   elegivel: boolean;
 }) {
-  if (!elegivel) return <Badge variant="secondary">Fora do critério</Badge>;
+  if (!elegivel) {
+    return (
+      <Badge variant="secondary">
+        <BadgeAlert className="mr-1 size-3" />
+        Fora do critério
+      </Badge>
+    );
+  }
   if (status === "qualificado") {
     return (
       <Badge className="bg-primary text-primary-foreground hover:bg-primary/90">
@@ -241,24 +320,39 @@ export function ProspectStatusBadge({
     );
   }
   if (status === "marginal") {
-    return <Badge className="bg-warning text-warning-foreground hover:bg-warning/90">Marginal</Badge>;
+    return (
+      <Badge className="bg-warning text-warning-foreground hover:bg-warning/90">
+        <BadgeAlert className="mr-1 size-3" />
+        Marginal
+      </Badge>
+    );
   }
-  return <Badge variant="secondary">Rejeitado</Badge>;
+  return (
+    <Badge variant="secondary">
+      <BadgeAlert className="mr-1 size-3" />
+      Rejeitado
+    </Badge>
+  );
 }
 
 export function InfoField({
+  icon,
   label,
   value,
   valueClassName,
 }: {
+  icon?: ReactNode;
   label: string;
   value: ReactNode;
   valueClassName?: string;
 }) {
   return (
-    <div className="space-y-0.5">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className={`text-sm font-medium ${valueClassName ?? ""}`}>{value}</dd>
+    <div className="flex gap-2">
+      {icon ? <div className="mt-0.5 text-primary/60 [&_svg]:size-3.5">{icon}</div> : null}
+      <div className="min-w-0 space-y-0.5">
+        <dt className="text-xs text-muted-foreground">{label}</dt>
+        <dd className={`break-words text-sm font-medium ${valueClassName ?? ""}`}>{value}</dd>
+      </div>
     </div>
   );
 }
@@ -277,6 +371,31 @@ export function ProspectDetailsCard({
       : details.homonimo.risco === "medio"
         ? "text-warning"
         : "text-primary";
+  const rendaAjustada =
+    details.rendaAnualEstimada !== null
+      ? ajustarInflacao(details.rendaAnualEstimada, details.rendaAnoReferencia, 0.055)
+      : null;
+  const rendaValue = rendaAjustada !== null ? brl(rendaAjustada) : "Não disponível";
+  const programaValue =
+    details.beneficiarioProgramaSocial === null
+      ? "Sem dado confiável"
+      : details.beneficiarioProgramaSocial
+        ? details.programaSocialDescricao || "Beneficiário"
+        : "Não identificado";
+  const localizacaoValue =
+    [details.localizacao.municipio, details.localizacao.uf]
+      .filter(Boolean)
+      .join(" / ") || "Não disponível";
+  // IPCA acumulado 2010→2026 ≈ 2,8×
+  const IPCA_2010_2026 = 2.8;
+  const rendaPerCapitaValue =
+    details.localizacao.rendaPerCapita !== null
+      ? `${brl(details.localizacao.rendaPerCapita * IPCA_2010_2026)} (~2026)`
+      : "Não disponível";
+  const observation = details.homonimo.observacao
+    .replace(/enriquecimento feito com cpf\/cnpj\.?/gi, "")
+    .replace(/enriquecimento feito com documento\.?/gi, "")
+    .trim();
 
   return (
     <Card className={borderClass}>
@@ -286,52 +405,48 @@ export function ProspectDetailsCard({
           Perfil socioeconômico
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+      <CardContent className="space-y-5">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Banknote className="size-3.5 text-primary/60" />
+              Renda mensal estimada
+            </div>
+            <p className="mt-1 text-3xl font-bold tracking-tight text-foreground">
+              {rendaAjustada !== null ? `~${brl(rendaAjustada / 12)}` : "—"}
+            </p>
+          </div>
+          <div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Banknote className="size-3.5 text-primary/60" />
+              Renda anual estimada
+            </div>
+            <p className="mt-1 text-xl font-semibold tracking-tight text-muted-foreground">{rendaValue}</p>
+          </div>
+        </div>
+
+        <Separator />
+
+        <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
+          <InfoField icon={<HandHeart />} label="Programas sociais" value={programaValue} />
           <InfoField
-            label="Renda anual estimada"
-            value={
-              details.rendaAnualEstimada !== null
-                ? `${brl(details.rendaAnualEstimada)}${details.rendaAnoReferencia ? ` · ${details.rendaAnoReferencia}` : ""}`
-                : "Não disponível"
-            }
-          />
-          <InfoField
-            label="Programas sociais"
-            value={
-              details.beneficiarioProgramaSocial === null
-                ? "Sem dado confiável"
-                : details.beneficiarioProgramaSocial
-                  ? details.programaSocialDescricao || "Beneficiário"
-                  : "Não identificado"
-            }
-          />
-          <InfoField
-            label="Localização"
-            value={
-              [details.localizacao.municipio, details.localizacao.uf]
-                .filter(Boolean)
-                .join(" / ") || "Não disponível"
-            }
-          />
-          <InfoField
-            label="Renda per capita do CEP"
-            value={
-              details.localizacao.rendaPerCapita !== null
-                ? brl(details.localizacao.rendaPerCapita)
-                : "Não disponível"
-            }
-          />
-          <InfoField label="Bairro" value={details.localizacao.bairro || "—"} />
-          <InfoField label="CEP" value={details.localizacao.cep || "—"} />
-          <InfoField
+            icon={<BadgeAlert />}
             label="Risco de homônimo"
             value={`${details.homonimo.risco.toUpperCase()}${details.homonimo.quantidade > 0 ? ` · ${details.homonimo.quantidade} ocorrência(s)` : ""}`}
             valueClassName={riskClass}
           />
-          <InfoField label="Critério de match" value={details.homonimo.criterio.replace(/_/g, " ")} />
+          <InfoField icon={<MapPin />} label="Localização" value={localizacaoValue} />
+          <InfoField icon={<Banknote />} label="Renda per capita do CEP" value={rendaPerCapitaValue} />
+          <InfoField icon={<Home />} label="Bairro" value={details.localizacao.bairro || "—"} />
+          <InfoField icon={<MapPin />} label="CEP" value={details.localizacao.cep || "—"} />
         </dl>
-        <p className="text-xs text-muted-foreground">{details.homonimo.observacao}</p>
+
+        {observation ? (
+          <div className="flex items-start gap-2 text-xs text-muted-foreground">
+            <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-primary/70" />
+            <div>{observation}</div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

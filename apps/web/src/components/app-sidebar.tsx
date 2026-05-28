@@ -47,11 +47,11 @@ export function AppSidebar() {
             <SidebarMenuButton asChild size="lg" className="hover:bg-transparent active:bg-transparent">
               <Link to="/">
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Landmark className="size-4" />
+                  <span className="font-heading text-lg italic leading-none">A</span>
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate font-bold"></span>
-                  <span className="truncate text-xs text-muted-foreground">Antecipação de Crédito</span>
+                  <span className="truncate font-heading text-base font-medium">Antecred</span>
+                  <span className="truncate text-xs text-muted-foreground">Créditos Judiciais</span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -117,11 +117,11 @@ export function AppSidebar() {
                 >
                   <Avatar className="size-8 rounded-lg shrink-0">
                     <AvatarFallback className="rounded-lg bg-primary/15 text-xs font-semibold text-primary">
-                      AC
+                      A
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold"></span>
+                    <span className="truncate font-heading text-sm font-medium">Antecred</span>
                     <span className="truncate text-xs text-muted-foreground">v0.2 · mar 2026</span>
                   </div>
                   <ChevronsUpDown className="ml-auto size-4 shrink-0 text-muted-foreground" />
@@ -138,11 +138,11 @@ export function AppSidebar() {
                   <div className="flex items-center gap-2 px-2 py-1.5 text-left text-sm">
                     <Avatar className="size-8 rounded-lg shrink-0">
                       <AvatarFallback className="rounded-lg bg-primary/15 text-xs font-semibold text-primary">
-                        AC
+                        A
                       </AvatarFallback>
                     </Avatar>
                     <div className="grid leading-tight">
-                      <span className="truncate font-semibold"></span>
+                      <span className="truncate font-heading text-sm font-medium">Antecred</span>
                       <span className="truncate text-xs text-muted-foreground">originação judicial</span>
                     </div>
                   </div>

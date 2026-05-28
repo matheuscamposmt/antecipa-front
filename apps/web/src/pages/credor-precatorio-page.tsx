@@ -86,7 +86,7 @@ export function CredorPrecatorioPage() {
           Credor · Precatório
         </p>
         <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold leading-tight text-emerald-950 lg:text-3xl">{detail.credorNome}</h1>
+            <h1 className="font-body text-2xl font-bold leading-tight text-emerald-950 lg:text-3xl">{detail.credorNome}</h1>
             <div className="h-8 w-px shrink-0 bg-border" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -105,7 +105,7 @@ export function CredorPrecatorioPage() {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-72 p-3">
-                <p className="mb-3 text-xs font-medium text-muted-foreground">Composição do score</p>
+                <p className="mb-3 text-xs font-medium text-muted-foreground">Composição do índice</p>
                 <ScoreBreakdown dimensions={[
                   {
                     label: "Ativo",

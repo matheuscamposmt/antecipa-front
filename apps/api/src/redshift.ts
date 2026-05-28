@@ -66,7 +66,7 @@ function mergePhones(target: Map<string, string[]>, key: string, phones: string[
   target.set(key, current);
 }
 
-async function loadPhonesByDocuments(documents: string[]): Promise<Map<string, string[]>> {
+export async function loadPhonesByDocuments(documents: string[]): Promise<Map<string, string[]>> {
   const normalized = Array.from(
     new Set(
       documents

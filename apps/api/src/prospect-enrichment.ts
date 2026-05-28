@@ -1,4 +1,5 @@
 import { buildNameNormalizationSql, normalizeNameForMatch, queryRows, toNumber } from "./redshift.js";
+import { ticketQualificationPoints } from "./scoring.js";
 
 export type DocType = "PF" | "PJ" | "OUTRO";
 
@@ -113,12 +114,21 @@ export function hasValidDocument(documento: string): boolean {
   return digits.length === 11 || digits.length === 14;
 }
 
-function rendaScore(value: number | null): number | null {
-  if (value === null) return null;
-  if (value <= 24_000) return 10;
-  if (value <= 60_000) return 8;
-  if (value <= 120_000) return 5;
-  return 2;
+// Ajuste inflacionário conservador (IPCA 5,5% a.a.) para calibrar dados históricos
+function ajustarInflacaoScore(valor: number, anoRef: number | null): number {
+  const anos = anoRef ? Math.max(0, 2026 - anoRef) : 0;
+  return valor * Math.pow(1.055, anos);
+}
+
+// Propensão à cessão: renda mensal ajustada para 2026 — quanto maior, menor o score
+function rendaScore(rendaAnual: number | null, anoRef: number | null): number | null {
+  if (rendaAnual === null) return null;
+  const mensal = ajustarInflacaoScore(rendaAnual, anoRef) / 12;
+  if (mensal <= 1_518) return 10; // ≤ salário mínimo 2026
+  if (mensal <= 3_000) return 8;
+  if (mensal <= 6_000) return 5;
+  if (mensal <= 12_000) return 2;
+  return 1;
 }
 
 function benefitsScore(value: boolean | null): number | null {
@@ -126,26 +136,24 @@ function benefitsScore(value: boolean | null): number | null {
   return value ? 8 : 2;
 }
 
+// Dados do censo 2010 — ajustados para 2026 antes de aplicar thresholds
 function locationScore(rendaPerCapita: number | null): number | null {
   if (rendaPerCapita === null) return null;
-  if (rendaPerCapita <= 900) return 7;
-  if (rendaPerCapita <= 1_800) return 5;
-  if (rendaPerCapita <= 3_000) return 3;
+  const adjusted = ajustarInflacaoScore(rendaPerCapita, 2010);
+  if (adjusted <= 2_000) return 7;
+  if (adjusted <= 4_000) return 5;
+  if (adjusted <= 7_000) return 3;
   return 1;
 }
 
 function proxyTipoPessoaScore(tipoPessoa: DocType): number {
   if (tipoPessoa === "PF") return 10;
-  if (tipoPessoa === "PJ") return 6;
+  if (tipoPessoa === "PJ") return 4;
   return 2;
 }
 
 function proxyValorScore(valor: number): number {
-  if (valor > 500_000) return 15;
-  if (valor >= 100_000) return 12;
-  if (valor >= 50_000) return 8;
-  if (valor >= 10_000) return 5;
-  return 2;
+  return ticketQualificationPoints(valor, 15);
 }
 
 async function loadRendaPerCapitaByCep(cep: string): Promise<number | null> {
@@ -353,21 +361,23 @@ export function buildCredorScoreDimension(params: {
   prospect: ProspectDetails;
 }): DetailScoreDimension {
   const { tipoPessoa, valor, prospect } = params;
-  const rendaPts = rendaScore(prospect.rendaAnualEstimada);
+  const rendaPts = rendaScore(prospect.rendaAnualEstimada, prospect.rendaAnoReferencia);
   const beneficiosPts = benefitsScore(prospect.beneficiarioProgramaSocial);
   const localizacaoPts = locationScore(prospect.localizacao.rendaPerCapita);
   const realSignals = [rendaPts, beneficiosPts, localizacaoPts].filter((value) => value !== null).length;
 
   if (tipoPessoa !== "PF") {
     const tipoPessoaPts = proxyTipoPessoaScore(tipoPessoa);
-    const valorPts = proxyValorScore(valor);
+    // PJ tem peso de ticket reduzido — menor propensão à cessão que PF
+    const ticketMax = tipoPessoa === "PJ" ? 10 : 15;
+    const valorPts = ticketQualificationPoints(valor, ticketMax);
     return {
       total: tipoPessoaPts + valorPts,
       method: tipoPessoa === "PJ" ? "proxy_pj" : "proxy_outro",
-      note: "Renda e benefício social entraram só para pessoa física nesta etapa.",
+      note: "Renda e benefício social são exclusivos de pessoa física; pessoa jurídica usa proxy com peso reduzido.",
       items: [
-        { label: "Tipo de pessoa", pts: tipoPessoaPts, max: 10 },
-        { label: "Faixa de valor", pts: valorPts, max: 15 },
+        { label: "Tipo de pessoa", pts: tipoPessoaPts, max: tipoPessoa === "PJ" ? 4 : 2 },
+        { label: "Faixa de valor", pts: valorPts, max: ticketMax },
       ],
     };
   }
@@ -378,7 +388,7 @@ export function buildCredorScoreDimension(params: {
     return {
       total: tipoPessoaPts + valorPts,
       method: "proxy_pf",
-      note: "Sem renda, benefício ou localização confiáveis; score do credor manteve o proxy legado.",
+      note: "Sem renda, benefício ou localização confiáveis; valor usa faixa de ticket comercial.",
       items: [
         { label: "Tipo de pessoa", pts: tipoPessoaPts, max: 10 },
         { label: "Faixa de valor", pts: valorPts, max: 15 },
@@ -389,17 +399,23 @@ export function buildCredorScoreDimension(params: {
   const rendaFinal = rendaPts ?? 5;
   const beneficiosFinal = beneficiosPts ?? 4;
   const localizacaoFinal = localizacaoPts ?? 3;
+  const rendaSignal = Math.round((rendaFinal / 10) * 7);      // max 7 — principal sinal de propensão
+  const beneficiosSignal = Math.round((beneficiosFinal / 8) * 2); // max 2
+  const localizacaoSignal = Math.round((localizacaoFinal / 7) * 3); // max 3
+  const valorPts = ticketQualificationPoints(valor, 13);       // max 13
+
   return {
-    total: rendaFinal + beneficiosFinal + localizacaoFinal,
+    total: rendaSignal + beneficiosSignal + localizacaoSignal + valorPts,
     method: realSignals === 3 ? "real_pf" : "hibrido_pf",
     note:
       realSignals === 3
-        ? "Score do credor baseado em renda, benefícios sociais e renda per capita do CEP."
-        : "Score híbrido: sinais reais disponíveis completados com pontos neutros quando faltou dado confiável.",
+        ? "Índice do credor baseado em faixa de ticket, renda mensal ajustada, benefícios sociais e renda per capita do CEP."
+        : "Índice híbrido: faixa de ticket e sinais reais disponíveis, com pontos neutros quando faltou dado confiável.",
     items: [
-      { label: "Renda anual estimada", pts: rendaFinal, max: 10 },
-      { label: "Programas sociais", pts: beneficiosFinal, max: 8 },
-      { label: "Localização / CEP", pts: localizacaoFinal, max: 7 },
+      { label: "Renda mensal estimada", pts: rendaSignal, max: 7 },
+      { label: "Programas sociais", pts: beneficiosSignal, max: 2 },
+      { label: "Localização / CEP", pts: localizacaoSignal, max: 3 },
+      { label: "Faixa de valor", pts: valorPts, max: 13 },
     ],
   };
 }

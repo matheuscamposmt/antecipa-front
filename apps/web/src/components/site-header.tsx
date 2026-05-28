@@ -22,7 +22,7 @@ export function SiteHeader() {
   const crumbs = getBreadcrumbs(location.pathname);
 
   return (
-    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b bg-background/80 px-4 backdrop-blur lg:px-6">
+    <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border/70 bg-background/85 px-4 backdrop-blur lg:px-6">
       <SidebarTrigger />
       {back ? (
         <Link

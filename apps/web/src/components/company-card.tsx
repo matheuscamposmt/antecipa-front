@@ -2,7 +2,7 @@ import type { ComponentType } from "react";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, Building2, CalendarDays, CircleHelp, FileText, Landmark, Scale, Users } from "lucide-react";
 import type { Company } from "@/types";
-import { brl, integer } from "@/lib/format";
+import { brl, formatDate, integer } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,7 +19,7 @@ export function CompanyCard({ company }: Props) {
     <Card className="animate-enter flex h-full flex-col border-border bg-card">
       <CardHeader className="space-y-2 pb-2">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="line-clamp-2 text-base leading-snug">{company.nomeEmpresa}</CardTitle>
+          <CardTitle className="font-body line-clamp-2 text-base font-bold leading-snug">{company.nomeEmpresa}</CardTitle>
           <Building2 className="mt-0.5 size-4 shrink-0 text-primary/60" />
         </div>
       </CardHeader>
@@ -29,7 +29,7 @@ export function CompanyCard({ company }: Props) {
           <DateStat
             icon={CalendarDays}
             label="Relação de credores"
-            value={company.dataDocumento || "—"}
+            value={formatDate(company.dataDocumento)}
             tooltip="Data da relação de credores usada como base."
           />
         </div>

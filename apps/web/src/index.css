@@ -1,44 +1,56 @@
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&display=swap");
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 220 13% 98%;       /* #F9FAFB */
-    --foreground: 215 32% 17%;       /* #1D2939 */
-    --card: 0 0% 100%;               /* #FFFFFF */
-    --card-foreground: 215 32% 17%;  /* #1D2939 */
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 32% 17%;
-    --primary: 153 96% 30%;          /* #039855 */
+    --ante-bg: oklch(0.985 0.008 85);
+    --ante-bg-panel: oklch(0.965 0.012 85);
+    --ante-ink: oklch(0.22 0.01 80);
+    --ante-brand: oklch(0.32 0.05 155);
+    --ante-brand-deep: oklch(0.24 0.05 155);
+    --ante-accent: oklch(0.55 0.12 45);
+    --f-heading: "Source Serif 4", Georgia, serif;
+    --f-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --f-mono: "JetBrains Mono", ui-monospace, monospace;
+    --shadow-sm: 0 1px 2px oklch(0.2 0.02 80 / 0.04), 0 1px 3px oklch(0.2 0.02 80 / 0.06);
+    --shadow-md: 0 4px 12px oklch(0.2 0.02 80 / 0.06), 0 2px 4px oklch(0.2 0.02 80 / 0.04);
+    --background: 48 42% 98%;
+    --foreground: 40 18% 17%;
+    --card: 48 55% 99%;
+    --card-foreground: 40 18% 17%;
+    --popover: 48 55% 99%;
+    --popover-foreground: 40 18% 17%;
+    --primary: 153 42% 28%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 93%;        /* #EAECF0 */
-    --secondary-foreground: 215 32% 17%;
-    --muted: 220 14% 93%;            /* #EAECF0 */
-    --muted-foreground: 220 13% 46%; /* #667085 */
-    --accent: 220 14% 93%;
-    --accent-foreground: 215 32% 17%;
-    --destructive: 4 68% 49%;        /* #D92D20 */
+    --secondary: 47 25% 92%;
+    --secondary-foreground: 40 18% 17%;
+    --muted: 47 25% 92%;
+    --muted-foreground: 40 8% 44%;
+    --accent: 48 30% 93%;
+    --accent-foreground: 40 18% 17%;
+    --destructive: 4 68% 49%;
     --destructive-foreground: 0 0% 98%;
-    --border: 220 13% 84%;           /* #D0D5DD */
-    --input: 220 13% 84%;            /* #D0D5DD */
-    --ring: 153 96% 30%;             /* #039855 */
-    --warning: 34 94% 50%;           /* #F79009 */
-    --radius: 0.5rem;
-    --chart-1: 142 76% 39%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
+    --border: 43 16% 86%;
+    --input: 43 16% 86%;
+    --ring: 153 42% 28%;
+    --warning: 34 82% 48%;
+    --radius: 0.625rem;
+    --radius-lg: 1rem;
+    --chart-1: 153 42% 28%;
+    --chart-2: 166 38% 35%;
+    --chart-3: 43 55% 36%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 215 32% 17%;
-    --sidebar-primary: 153 96% 30%;
+    --sidebar-background: 48 42% 98%;
+    --sidebar-foreground: 40 18% 17%;
+    --sidebar-primary: 153 42% 28%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 14% 93%;
-    --sidebar-accent-foreground: 215 32% 17%;
-    --sidebar-border: 220 13% 84%;
-    --sidebar-ring: 153 96% 30%;
+    --sidebar-accent: 47 25% 92%;
+    --sidebar-accent-foreground: 40 18% 17%;
+    --sidebar-border: 43 16% 86%;
+    --sidebar-ring: 153 42% 28%;
   }
 
   .dark {
@@ -82,11 +94,25 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Manrope", "Segoe UI", sans-serif;
+    font-family: var(--f-body);
     background-image:
-      radial-gradient(circle at 15% -10%, hsl(var(--primary) / 0.08), transparent 36%),
-      radial-gradient(circle at 85% 0%, hsl(var(--chart-2) / 0.1), transparent 40%);
+      radial-gradient(circle at 12% -12%, hsl(var(--primary) / 0.08), transparent 34%),
+      radial-gradient(circle at 88% -8%, hsl(var(--chart-4) / 0.12), transparent 38%);
     min-height: 100vh;
+  }
+
+  h1,
+  h2 {
+    font-family: var(--f-heading);
+    text-wrap: balance;
+  }
+
+  code,
+  kbd,
+  samp,
+  pre,
+  .font-mono {
+    font-family: var(--f-mono);
   }
 }
 
@@ -104,5 +130,13 @@
 
   .animate-enter {
     animation: fade-up 0.35s ease-out both;
+  }
+
+  .font-heading {
+    font-family: var(--f-heading);
+  }
+
+  .font-body {
+    font-family: var(--f-body);
   }
 }
