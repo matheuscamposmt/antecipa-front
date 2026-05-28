@@ -19,7 +19,6 @@ import {
   ShieldCheck,
   Users,
   User,
-  WalletCards,
 } from "lucide-react";
 import { fetchCredorParentes, fetchCredorRJDetail, fetchCredorRJPhones, type CredorParentesResponse } from "@/lib/api";
 import { ajustarInflacao, brl, documentId, formatDate } from "@/lib/format";
