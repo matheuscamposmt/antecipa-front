@@ -2,11 +2,21 @@ import { Pool } from "pg";
 
 const connectionString = process.env.REDSHIFT_DSN ?? "";
 
+// Redshift tem concorrência limitada (WLM). Mantemos o pool modesto para não
+// enfileirar dezenas de queries no warehouse, mas com timeouts curtos para que
+// um request lento falhe rápido em vez de segurar o slot e travar todo o sistema.
 const pool =
   connectionString
     ? new Pool({
         connectionString,
         ssl: process.env.REDSHIFT_SSLMODE === "disable" ? false : { rejectUnauthorized: false },
+        max: Number.parseInt(process.env.REDSHIFT_POOL_MAX ?? "8", 10),
+        idleTimeoutMillis: 30_000,
+        // falha rápido quando o pool está saturado, em vez de pendurar a request
+        connectionTimeoutMillis: 10_000,
+        // mata queries que rodam demais no servidor (libera o slot do pool/WLM)
+        statement_timeout: 20_000,
+        query_timeout: 25_000,
       })
     : null;
 
@@ -78,6 +88,10 @@ export async function loadPhonesByDocuments(documents: string[]): Promise<Map<st
     return new Map();
   }
 
+  // `telecom.contatos.documento` é armazenado já como dígitos puros (11/14).
+  // Comparamos a coluna crua direto contra os dígitos — sem REGEXP_REPLACE por
+  // linha, que anulava a sort key e forçava full scan (causa da lentidão e do
+  // timeout de 6s que zerava os telefones).
   const placeholders = buildParameterList(normalized.length);
   const timeout = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error("phone lookup timeout")), PHONES_TIMEOUT_MS),
@@ -88,7 +102,7 @@ export async function loadPhonesByDocuments(documents: string[]): Promise<Map<st
         SELECT documento, telefone
         FROM telecom.contatos
         WHERE telefone IS NOT NULL
-          AND REGEXP_REPLACE(COALESCE(documento, ''), '\\\\D', '') IN (${placeholders})
+          AND documento IN (${placeholders})
       `,
       normalized,
     ),

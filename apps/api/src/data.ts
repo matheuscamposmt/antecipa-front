@@ -9,6 +9,7 @@ import {
 } from "./prospect-enrichment.js";
 import { loadPhonesByDocuments, normalizeNameForMatch, queryRows, toNumber } from "./redshift.js";
 import { ticketQualificationPoints } from "./scoring.js";
+import { clearAllCaches, createCache, DEFAULT_TTL_MS } from "./cache.js";
 
 type NullableString = string | null;
 
@@ -439,7 +440,21 @@ async function loadLoadedAt(): Promise<string> {
   return rows[0]?.loaded_at ?? new Date().toISOString();
 }
 
+// Caches em memória (TTL curto) no caminho quente. Os dados só mudam quando
+// documentos são reprocessados no Redshift; /api/reload limpa todos via
+// clearAllCaches(). Veja cache.ts para o racional (1 instância → RAM basta).
+const summariesCache = createCache<CompanyItem[]>(DEFAULT_TTL_MS, 1);
+const companyDetailCache = createCache<CompanyDetail | null>(DEFAULT_TTL_MS);
+const credorDetailCache = createCache<CredorRJDetail | null>(DEFAULT_TTL_MS);
+const credorPhonesCache = createCache<string[]>(DEFAULT_TTL_MS);
+const credorParentesCache = createCache<ParentesResult | null>(DEFAULT_TTL_MS);
+const overviewCache = createCache<OverviewData>(DEFAULT_TTL_MS, 1);
+
 async function loadCompanySummaries(): Promise<CompanyItem[]> {
+  return summariesCache.get("all", fetchCompanySummaries);
+}
+
+async function fetchCompanySummaries(): Promise<CompanyItem[]> {
   const rows = await queryRows<CompanySummaryRow>(
     `
       WITH docs AS (
@@ -697,6 +712,10 @@ async function loadClasseBreakdown(): Promise<ClasseBreakdownItem[]> {
 }
 
 export async function loadOverview(): Promise<OverviewData> {
+  return overviewCache.get("all", fetchOverview);
+}
+
+async function fetchOverview(): Promise<OverviewData> {
   const [loadedAt, companies, topClasses, classeBreakdown] = await Promise.all([
     loadLoadedAt(),
     loadCompanySummaries(),
@@ -741,6 +760,10 @@ export async function loadCompanies(): Promise<CompanyItem[]> {
 }
 
 export async function loadCompanyDetail(slug: string): Promise<CompanyDetail | null> {
+  return companyDetailCache.get(slug, () => fetchCompanyDetail(slug));
+}
+
+async function fetchCompanyDetail(slug: string): Promise<CompanyDetail | null> {
   const companies = await loadCompanies();
   const company = companies.find((item) => item.slug === slug);
   if (!company) {
@@ -790,6 +813,10 @@ export async function loadCompanyDetail(slug: string): Promise<CompanyDetail | n
 }
 
 export async function loadCredorRJDetail(hash: string): Promise<CredorRJDetail | null> {
+  return credorDetailCache.get(hash, () => fetchCredorRJDetail(hash));
+}
+
+async function fetchCredorRJDetail(hash: string): Promise<CredorRJDetail | null> {
   type CredorRow = {
     row_hash: string;
     nome: string;
@@ -918,6 +945,10 @@ export async function loadCredorRJDetail(hash: string): Promise<CredorRJDetail |
 }
 
 export async function loadCredorPhones(hash: string): Promise<string[]> {
+  return credorPhonesCache.get(hash, () => fetchCredorPhones(hash));
+}
+
+async function fetchCredorPhones(hash: string): Promise<string[]> {
   const rows = await queryRows<{ nome: string; cpf_cnpj: string | null }>(
     `SELECT nome, cpf_cnpj FROM administradores_judiciais.credores WHERE row_hash = $1 LIMIT 1`,
     [hash],
@@ -961,6 +992,10 @@ function maskCpf(cpf: string): string {
 }
 
 export async function loadCredorParentes(hash: string): Promise<ParentesResult | null> {
+  return credorParentesCache.get(hash, () => fetchCredorParentes(hash));
+}
+
+async function fetchCredorParentes(hash: string): Promise<ParentesResult | null> {
   const credorRows = await queryRows<{ nome: string; cpf_cnpj: string | null }>(
     `SELECT nome, cpf_cnpj FROM administradores_judiciais.credores WHERE row_hash = $1 LIMIT 1`,
     [hash],
@@ -1016,44 +1051,86 @@ export async function loadCredorParentes(hash: string): Promise<ParentesResult |
     return { credorNome, parentes: [] };
   }
 
-  // 3. For each relative, fetch income and social program in parallel
-  const parentes: ParenteItem[] = await Promise.all(
-    relRows.map(async (rel) => {
-      const relCpf = rel.cpf.replace(/\D/g, "");
-
-      const [rendaRows, benefitRows] = await Promise.all([
-        queryRows<{ ganho: string | number; ano: string | number }>(
-          `SELECT ganho, ano FROM renda.ganho_anual_pf_emprego WHERE cpf = $1 ORDER BY ano DESC LIMIT 1`,
-          [relCpf],
-        ).catch(() => []),
-        queryRows<{ ano_referencia: string | number | null; beneficios: string | null }>(
-          `
-            SELECT MAX(ano_referencia) AS ano_referencia,
-                   LISTAGG(DISTINCT nome_beneficio, ', ') WITHIN GROUP (ORDER BY nome_beneficio) AS beneficios
-            FROM transparencia.beneficiarios_sociais_resultado_por_ano
-            WHERE cpf = $1
-              AND ano_referencia = (SELECT MAX(ano_referencia) FROM transparencia.beneficiarios_sociais_resultado_por_ano WHERE cpf = $1)
-          `,
-          [relCpf],
-        ).catch(() => []),
-      ]);
-
-      const isBeneficiary = benefitRows.length > 0 && benefitRows[0]?.ano_referencia != null;
-
-      return {
-        nome: rel.nome,
-        cpfMasked: maskCpf(relCpf),
-        municipio: rel.municipio ?? "",
-        uf: rel.uf ?? "",
-        rendaAnualEstimada: rendaRows.length > 0 ? toNumber(rendaRows[0]?.ganho) : null,
-        rendaAnoReferencia: rendaRows.length > 0 ? Number.parseInt(String(rendaRows[0]?.ano ?? 0), 10) || null : null,
-        beneficiarioProgramaSocial: isBeneficiary,
-        programaSocialDescricao: (benefitRows[0]?.beneficios ?? "").trim(),
-      };
-    }),
+  // 3. Fetch income + social program for ALL relatives in two batched queries.
+  // Antes eram 2×N queries paralelas (até 40 por request), o que sozinho
+  // esgotava o pool de conexões e travava o sistema sob concorrência.
+  const relCpfs = Array.from(new Set(relRows.map((rel) => rel.cpf.replace(/\D/g, "")))).filter(
+    (cpf) => cpf.length === 11,
   );
 
+  const rendaByCpf = new Map<string, { ganho: string | number; ano: string | number }>();
+  const benefitByCpf = new Map<string, { ano_referencia: string | number | null; beneficios: string | null }>();
+
+  if (relCpfs.length > 0) {
+    const placeholders = relCpfs.map((_, index) => `$${index + 1}`).join(", ");
+
+    const [rendaRows, benefitRows] = await Promise.all([
+      queryRows<{ cpf: string; ganho: string | number; ano: string | number }>(
+        `
+          SELECT cpf, ganho, ano
+          FROM (
+            SELECT cpf, ganho, ano,
+                   ROW_NUMBER() OVER (PARTITION BY cpf ORDER BY ano DESC, ganho DESC) AS rn
+            FROM renda.ganho_anual_pf_emprego
+            WHERE cpf IN (${placeholders})
+          ) t
+          WHERE rn = 1
+        `,
+        relCpfs,
+      ).catch(() => [] as Array<{ cpf: string; ganho: string | number; ano: string | number }>),
+      queryRows<{ cpf: string; ano_referencia: string | number | null; beneficios: string | null }>(
+        `
+          WITH latest AS (
+            SELECT cpf, MAX(ano_referencia) AS max_ano
+            FROM transparencia.beneficiarios_sociais_resultado_por_ano
+            WHERE cpf IN (${placeholders})
+            GROUP BY cpf
+          )
+          SELECT b.cpf,
+                 l.max_ano AS ano_referencia,
+                 LISTAGG(DISTINCT b.nome_beneficio, ', ') WITHIN GROUP (ORDER BY b.nome_beneficio) AS beneficios
+          FROM transparencia.beneficiarios_sociais_resultado_por_ano b
+          JOIN latest l ON l.cpf = b.cpf AND b.ano_referencia = l.max_ano
+          GROUP BY b.cpf, l.max_ano
+        `,
+        relCpfs,
+      ).catch(() => [] as Array<{ cpf: string; ano_referencia: string | number | null; beneficios: string | null }>),
+    ]);
+
+    for (const row of rendaRows) {
+      rendaByCpf.set(String(row.cpf).replace(/\D/g, ""), { ganho: row.ganho, ano: row.ano });
+    }
+    for (const row of benefitRows) {
+      benefitByCpf.set(String(row.cpf).replace(/\D/g, ""), {
+        ano_referencia: row.ano_referencia,
+        beneficios: row.beneficios,
+      });
+    }
+  }
+
+  const parentes: ParenteItem[] = relRows.map((rel) => {
+    const relCpf = rel.cpf.replace(/\D/g, "");
+    const renda = rendaByCpf.get(relCpf);
+    const benefit = benefitByCpf.get(relCpf);
+    const isBeneficiary = benefit != null && benefit.ano_referencia != null;
+
+    return {
+      nome: rel.nome,
+      cpfMasked: maskCpf(relCpf),
+      municipio: rel.municipio ?? "",
+      uf: rel.uf ?? "",
+      rendaAnualEstimada: renda ? toNumber(renda.ganho) : null,
+      rendaAnoReferencia: renda ? Number.parseInt(String(renda.ano ?? 0), 10) || null : null,
+      beneficiarioProgramaSocial: isBeneficiary,
+      programaSocialDescricao: (benefit?.beneficios ?? "").trim(),
+    };
+  });
+
   return { credorNome, parentes };
+}
+
+export function invalidateCaches(): void {
+  clearAllCaches();
 }
 
 export { buildCompanySlug };

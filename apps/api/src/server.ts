@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { z } from "zod";
-import { loadCompanies, loadCompanyDetail, loadCredorParentes, loadCredorPhones, loadCredorRJDetail, loadOverview, type CompanyItem } from "./data.js";
+import { invalidateCaches, loadCompanies, loadCompanyDetail, loadCredorParentes, loadCredorPhones, loadCredorRJDetail, loadOverview, type CompanyItem } from "./data.js";
 import { hasRedshiftConfigured } from "./redshift.js";
 import { loadCredorPrecatorioDetail, loadPrecatorioDebtors, loadPrecatorioDetail, loadPrecatorioOverview, loadProcessoDetail } from "./precatorios-data.js";
 
@@ -38,7 +38,8 @@ server.get("/api/health", async () => {
 });
 
 server.get("/api/reload", async () => {
-  return { ok: true, message: "API sem cache em memória; nada para recarregar." };
+  invalidateCaches();
+  return { ok: true, message: "Caches invalidados." };
 });
 
 server.get("/api/overview", async () => loadOverview());
